@@ -269,6 +269,9 @@ async function handlePinSubmit(e) {
     }
 
     // Success -> Enter Command Center
+    if (data.token) {
+      localStorage.setItem('oska_admin_token', data.token);
+    }
     adminState.authenticated = true;
     showToast('Admin Command Center Unlocked');
     enterCommandCenter(data.admin);
@@ -287,9 +290,22 @@ function showGateCodeError(msg) {
 // -------------------------------------------------------------
 // 4. Session Validation & Command Center Entry
 // -------------------------------------------------------------
+async function adminFetch(url, options = {}) {
+  const token = localStorage.getItem('oska_admin_token');
+  const headers = Object.assign({}, options.headers || {});
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: headers
+  });
+}
+
 async function checkExistingAdminSession() {
   try {
-    const res = await fetch('/api/admin/session');
+    const res = await adminFetch('/api/admin/session');
     if (res.ok) {
       const data = await res.json();
       if (data.authenticated) {
@@ -314,8 +330,8 @@ function enterCommandCenter(adminInfo) {
   // Load live data
   refreshAdminData();
 
-  // Start periodic polling for live presence & health (every 4s for true real-time visibility)
-  setInterval(pollLivePresence, 4000);
+  // Start periodic polling for live presence & health (every 3.5s for real-time visibility)
+  setInterval(pollLivePresence, 3500);
 }
 
 // -------------------------------------------------------------
@@ -424,7 +440,7 @@ async function refreshAdminData() {
 }
 
 async function loadOverviewData() {
-  const res = await fetch('/api/admin/overview');
+  const res = await adminFetch('/api/admin/overview');
   if (!res.ok) return;
   const data = await res.json();
 
@@ -534,7 +550,7 @@ function renderOverviewCharts(data) {
 }
 
 async function loadLivePresenceData() {
-  const res = await fetch('/api/admin/live');
+  const res = await adminFetch('/api/admin/live');
   if (!res.ok) return;
   const data = await res.json();
 
@@ -574,7 +590,7 @@ async function pollLivePresence() {
 }
 
 async function loadUsersData() {
-  const res = await fetch('/api/admin/users');
+  const res = await adminFetch('/api/admin/users');
   if (!res.ok) return;
   const data = await res.json();
   allUsersData = data.users || [];
@@ -618,7 +634,7 @@ async function openUserActionPrompt(uid, currentStatus) {
   const action = prompt(`Select action for user ${uid}:\n1. SUSPEND\n2. REACTIVATE\n3. RESET_LIMITS\n\nType action in uppercase:`, currentStatus === 'ACTIVE' ? 'SUSPEND' : 'REACTIVATE');
   if (!action) return;
 
-  const res = await fetch('/api/admin/users/action', {
+  const res = await adminFetch('/api/admin/users/action', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ targetUid: uid, action: action.trim() })
@@ -634,7 +650,7 @@ async function openUserActionPrompt(uid, currentStatus) {
 }
 
 async function loadChatsData() {
-  const res = await fetch('/api/admin/chats');
+  const res = await adminFetch('/api/admin/chats');
   if (!res.ok) return;
   const data = await res.json();
   const tbody = document.getElementById('chatsTableBody');
@@ -665,7 +681,7 @@ function inspectChatPrivileged(chatId) {
 }
 
 async function loadSearchData() {
-  const res = await fetch('/api/admin/search');
+  const res = await adminFetch('/api/admin/search');
   if (!res.ok) return;
   const data = await res.json();
   const tbody = document.getElementById('searchTableBody');
@@ -691,7 +707,7 @@ async function loadSearchData() {
 }
 
 async function loadUsageData() {
-  const res = await fetch('/api/admin/usage');
+  const res = await adminFetch('/api/admin/usage');
   if (!res.ok) return;
   const data = await res.json();
   const tbody = document.getElementById('usageTableBody');
@@ -717,7 +733,7 @@ async function loadUsageData() {
 }
 
 async function loadModelsData() {
-  const res = await fetch('/api/models');
+  const res = await adminFetch('/api/models');
   if (!res.ok) return;
   const data = await res.json();
   const models = data.models || [];
@@ -752,7 +768,7 @@ async function loadModelsData() {
 }
 
 async function toggleModelStatus(modelId, enabled) {
-  await fetch('/api/admin/models', {
+  await adminFetch('/api/admin/models', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ modelId, action: enabled ? 'ENABLE' : 'DISABLE' })
@@ -761,7 +777,7 @@ async function toggleModelStatus(modelId, enabled) {
 }
 
 async function setGlobalDefaultModel(modelId) {
-  await fetch('/api/admin/models', {
+  await adminFetch('/api/admin/models', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ modelId, action: 'SET_DEFAULT' })
@@ -770,7 +786,7 @@ async function setGlobalDefaultModel(modelId) {
 }
 
 async function loadProvidersData() {
-  const res = await fetch('/api/admin/providers');
+  const res = await adminFetch('/api/admin/providers');
   if (!res.ok) return;
   const data = await res.json();
   const grid = document.getElementById('providersAdminGrid');
@@ -809,7 +825,7 @@ async function loadProvidersData() {
 }
 
 async function toggleProviderStatus(providerId, enabled) {
-  await fetch('/api/admin/providers', {
+  await adminFetch('/api/admin/providers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ providerId, action: enabled ? 'ENABLE' : 'DISABLE' })
@@ -819,7 +835,7 @@ async function toggleProviderStatus(providerId, enabled) {
 }
 
 async function loadFilesData() {
-  const res = await fetch('/api/library');
+  const res = await adminFetch('/api/library');
   if (!res.ok) return;
   const data = await res.json();
   const tbody = document.getElementById('filesTableBody');
@@ -842,7 +858,7 @@ async function loadFilesData() {
 }
 
 async function loadProjectsData() {
-  const res = await fetch('/api/projects');
+  const res = await adminFetch('/api/projects');
   if (!res.ok) return;
   const data = await res.json();
   const tbody = document.getElementById('projectsTableBody');
@@ -865,7 +881,7 @@ async function loadProjectsData() {
 }
 
 async function loadSecurityData() {
-  const res = await fetch('/api/admin/security');
+  const res = await adminFetch('/api/admin/security');
   if (!res.ok) return;
   const data = await res.json();
   const tbody = document.getElementById('securityTableBody');
@@ -887,7 +903,7 @@ async function loadSecurityData() {
 }
 
 async function loadAuditData() {
-  const res = await fetch('/api/admin/audit');
+  const res = await adminFetch('/api/admin/audit');
   if (!res.ok) return;
   const data = await res.json();
   const tbody = document.getElementById('auditTableBody');
@@ -911,7 +927,7 @@ async function loadAuditData() {
 }
 
 async function loadSystemSettings() {
-  const res = await fetch('/api/admin/system');
+  const res = await adminFetch('/api/admin/system');
   if (!res.ok) return;
   const data = await res.json();
   const sys = data.systemSettings;
@@ -939,7 +955,7 @@ async function loadSystemSettings() {
 
 async function toggleMaintenanceMode(enabled) {
   const msg = document.getElementById('sysMaintenanceMsgInput').value;
-  await fetch('/api/admin/system', {
+  await adminFetch('/api/admin/system', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ maintenanceEnabled: enabled, maintenanceMessage: msg })
@@ -953,7 +969,7 @@ async function saveMaintenanceSettings() {
   const msg = document.getElementById('sysMaintenanceMsgInput').value;
   const endAt = document.getElementById('sysMaintenanceEndInput').value;
 
-  await fetch('/api/admin/system', {
+  await adminFetch('/api/admin/system', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ maintenanceEnabled: enabled, maintenanceMessage: msg, maintenanceEndAt: endAt })
@@ -962,7 +978,7 @@ async function saveMaintenanceSettings() {
 }
 
 async function toggleEmergencyAiStop(enabled) {
-  await fetch('/api/admin/system', {
+  await adminFetch('/api/admin/system', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ emergencyAiStop: enabled })
@@ -971,7 +987,7 @@ async function toggleEmergencyAiStop(enabled) {
 }
 
 async function toggleSearchPrivacy(enabled) {
-  await fetch('/api/admin/system', {
+  await adminFetch('/api/admin/system', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ storeSearchQueries: enabled })
@@ -982,7 +998,7 @@ async function toggleSearchPrivacy(enabled) {
 async function toggleFeatureFlag(flagKey, enabled) {
   const flags = {};
   flags[flagKey] = enabled;
-  await fetch('/api/admin/system', {
+  await adminFetch('/api/admin/system', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ featureFlags: flags })
@@ -994,7 +1010,8 @@ async function toggleFeatureFlag(flagKey, enabled) {
 // 7. Lock & Sign Out
 // -------------------------------------------------------------
 async function lockAdminSession() {
-  await fetch('/api/admin/lock', { method: 'POST' });
+  await adminFetch('/api/admin/lock', { method: 'POST' });
+  localStorage.removeItem('oska_admin_token');
   adminState.authenticated = false;
   document.getElementById('adminAppLayout').classList.add('hidden');
   document.getElementById('adminAuthOverlay').classList.remove('hidden');
@@ -1003,7 +1020,8 @@ async function lockAdminSession() {
 }
 
 async function signOutAdmin() {
-  await fetch('/api/admin/signout', { method: 'POST' });
+  await adminFetch('/api/admin/signout', { method: 'POST' });
+  localStorage.removeItem('oska_admin_token');
   if (auth) {
     await auth.signOut();
   }

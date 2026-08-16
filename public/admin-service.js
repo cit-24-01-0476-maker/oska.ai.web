@@ -226,31 +226,34 @@ function verifyAccessCode(inputCode, storedHash) {
   }
 }
 
+const SESSION_SECRET = (process.env.ADMIN_SESSION_SECRET || ADMIN_ACCESS_CODE_HASH || 'oska_admin_secret_key_v1_2026').slice(0, 64);
+
 /**
- * Creates a cryptographically random admin session
+ * Creates a cryptographically signed HMAC admin session token (Persistent across Vercel cold restarts)
  */
 function createAdminSession(uid, email) {
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
   const now = Date.now();
-
-  const session = {
+  const payload = {
     id: 'as_' + crypto.randomBytes(8).toString('hex'),
     userId: uid,
     email: email,
-    tokenHash: tokenHash,
     createdAt: now,
     lastSeenAt: now,
-    expiresAt: now + SESSION_TTL_MS,
-    absoluteExpiresAt: now + ABSOLUTE_SESSION_MAX_MS
+    expiresAt: now + 24 * 60 * 60 * 1000 // 24-hour persistent admin session
   };
 
-  adminSessions.set(tokenHash, session);
-  return { rawToken, session };
+  const dataStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(dataStr).digest('base64url');
+  const signedToken = `${dataStr}.${signature}`;
+
+  const tokenHash = crypto.createHash('sha256').update(signedToken).digest('hex');
+  adminSessions.set(tokenHash, payload);
+
+  return { rawToken: signedToken, session: payload };
 }
 
 /**
- * Validates request admin session cookie or Authorization header
+ * Validates request admin session cookie or Authorization header (Works on any serverless lambda)
  */
 function requireAdminAccess(req) {
   let token = null;
@@ -259,34 +262,47 @@ function requireAdminAccess(req) {
   const cookieHeader = req.headers.cookie || '';
   const match = cookieHeader.match(/oska_admin_session=([^;]+)/);
   if (match) {
-    token = match[1];
+    token = match[1].trim();
   }
 
-  // 2. Check Authorization Header fallback
+  // 2. Check Authorization Header
   if (!token && req.headers.authorization) {
     const authParts = req.headers.authorization.split(' ');
     if (authParts.length === 2 && (authParts[0] === 'Bearer' || authParts[0] === 'AdminSession')) {
-      token = authParts[1];
+      token = authParts[1].trim();
     }
   }
 
   if (!token) return null;
 
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const session = adminSessions.get(tokenHash);
-  if (!session) return null;
-
-  const now = Date.now();
-  if (now > session.expiresAt || now > session.absoluteExpiresAt) {
-    adminSessions.delete(tokenHash);
-    recordAudit('ADMIN_SESSION_EXPIRED', session.email, 'SESSION', session.id, { reason: 'TTL_EXPIRED' });
-    return null;
+  // Validate Signed Token
+  const parts = token.split('.');
+  if (parts.length === 2) {
+    const [dataStr, sig] = parts;
+    try {
+      const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(dataStr).digest('base64url');
+      if (crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+        const payload = JSON.parse(Buffer.from(dataStr, 'base64url').toString('utf8'));
+        if (payload.expiresAt && payload.expiresAt > Date.now() && isAllowedAdminEmail(payload.email)) {
+          return {
+            id: payload.id,
+            userId: payload.userId || payload.uid,
+            email: payload.email,
+            expiresAt: payload.expiresAt
+          };
+        }
+      }
+    } catch (_) {}
   }
 
-  // Sliding idle window
-  session.lastSeenAt = now;
-  session.expiresAt = Math.min(now + SESSION_TTL_MS, session.absoluteExpiresAt);
-  return session;
+  // Fallback to in-memory check
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const session = adminSessions.get(tokenHash);
+  if (session && Date.now() < session.expiresAt && isAllowedAdminEmail(session.email)) {
+    return session;
+  }
+
+  return null;
 }
 
 // -------------------------------------------------------------
@@ -598,12 +614,13 @@ async function handleAdminRequest(pathname, req, res, getRequestBody) {
       recordAudit('ADMIN_UNLOCKED', verifiedUser.email, 'SESSION', session.id, { clientIp });
 
       const isProd = process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https';
-      res.setHeader('Set-Cookie', `oska_admin_session=${rawToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=1800; ${isProd ? 'Secure;' : ''}`);
+      res.setHeader('Set-Cookie', `oska_admin_session=${rawToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400; ${isProd ? 'Secure;' : ''}`);
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         success: true,
         message: 'Admin Command Center Unlocked',
+        token: rawToken,
         admin: {
           email: verifiedUser.email,
           name: verifiedUser.name,

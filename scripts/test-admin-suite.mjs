@@ -36,8 +36,8 @@ assert(adminService.verifyAccessCode('', testHash) === false, 'Empty access code
 // 2. Test Admin Session Generation & Validation
 console.log('\n--- 2. Admin Session Token & Sliding TTL ---');
 const { rawToken, session } = adminService.createAdminSession('test_uid', 'oshadhaperera500@gmail.com');
-assert(Boolean(rawToken && rawToken.length === 64), 'Generated cryptographically random 64-char hex session token');
-assert(Boolean(session && session.tokenHash), 'Session hash stored in secure ledger');
+assert(Boolean(rawToken && rawToken.includes('.')), 'Generated cryptographically signed HMAC admin session token');
+assert(Boolean(session && session.expiresAt), 'Session expiration timestamp properly configured');
 
 // Mock request with session cookie
 const mockReqValid = {

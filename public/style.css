@@ -3701,12 +3701,17 @@ button, input, textarea, select {
 .maintenance-screen-overlay {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   background: radial-gradient(circle at 50% 35%, #201e1b 0%, #121110 100%);
-  z-index: 99999;
+  z-index: 99999999 !important;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
+  pointer-events: auto;
+  user-select: none;
   animation: fadeInModal 0.25s ease forwards;
 }
 

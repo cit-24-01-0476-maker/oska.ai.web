@@ -3058,5 +3058,5 @@ async function checkPlatformMaintenanceStatus() {
 
 function initPlatformMaintenanceWatcher() {
   checkPlatformMaintenanceStatus();
-  setInterval(checkPlatformMaintenanceStatus, 8000);
+  setInterval(checkPlatformMaintenanceStatus, 4000);
 }
