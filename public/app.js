@@ -7,8 +7,8 @@
 // -------------------------------------------------------------
 // 1. Firebase Authentication Setup
 // -------------------------------------------------------------
-const firebaseConfig = {
-  apiKey: "AIzaSyAynMj77uns1Qcqn8OWNWpGAkOGvjQyIKE",
+let firebaseConfig = {
+  apiKey: "AIzaSyAynMj77unslQcqn8OWNWpGAkOGvjQyIKE",
   authDomain: "web-ai-5a12f.firebaseapp.com",
   projectId: "web-ai-5a12f",
   storageBucket: "web-ai-5a12f.firebasestorage.app",
@@ -18,14 +18,29 @@ const firebaseConfig = {
 
 let auth = null;
 
-if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+async function initFirebase() {
   try {
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
+    const res = await fetch('/api/config/firebase').catch(() => null);
+    if (res && res.ok) {
+      const serverConfig = await res.json();
+      if (serverConfig && serverConfig.apiKey) {
+        firebaseConfig = { ...firebaseConfig, ...serverConfig };
+      }
     }
-    auth = firebase.auth();
-  } catch (err) {
-    console.warn('Firebase initialization notice:', err);
+  } catch (e) {
+    // Keep local config
+  }
+
+  if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      auth = firebase.auth();
+      setupAuthListeners();
+    } catch (err) {
+      console.warn('Firebase initialization notice:', err);
+    }
   }
 }
 
@@ -333,11 +348,14 @@ function saveConversationsToStorage() {
 // -------------------------------------------------------------
 // 8. Initialization & DOM Setup
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// 8. Initialization & DOM Setup
+// -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   document.documentElement.setAttribute('data-theme', state.theme);
   updateThemeIcon();
 
-  setupAuthListeners();
+  initFirebase();
   setupUIEventListeners();
   setupSpeechRecognition();
   renderModelPopoverList();
@@ -382,22 +400,32 @@ function setupAuthListeners() {
   if (googleSignInBtn) {
     googleSignInBtn.addEventListener('click', async () => {
       if (!auth) {
-        showToast('Authentication ready in direct mode');
-        return;
+        showToast('Connecting to authentication service...');
+        await initFirebase();
+        if (!auth) {
+          showToast('Authentication initialization notice. Check connectivity.');
+          return;
+        }
       }
       try {
         googleSignInBtn.disabled = true;
         if (googleSignInBtnText) googleSignInBtnText.textContent = 'Connecting to Google...';
 
         const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
         await auth.signInWithPopup(provider);
 
         closeAuthModal();
         showToast('Signed in successfully with Google!');
       } catch (err) {
-        if (err.code !== 'auth/popup-closed-by-user') {
+        if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+          // User closed popup
+        } else if (err.code === 'auth/unauthorized-domain') {
+          console.error('Domain authorization notice:', err);
+          showToast('Domain authorization notice: Add domain in Firebase Console.');
+        } else {
           console.error('Google Sign-In notice:', err);
-          showToast('Sign-In notice: ' + (err.message || 'Check popup permissions'));
+          showToast('Unable to sign in with Google. Please try again.');
         }
       } finally {
         googleSignInBtn.disabled = false;

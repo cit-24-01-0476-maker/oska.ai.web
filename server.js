@@ -521,6 +521,23 @@ const server = http.createServer(async (req, res) => {
   }
 
   // -------------------------------------------------------------
+  // GET /api/config/firebase
+  // -------------------------------------------------------------
+  if (pathname === '/api/config/firebase' && req.method === 'GET') {
+    const firebaseConfig = {
+      apiKey: (process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "AIzaSyAynMj77unslQcqn8OWNWpGAkOGvjQyIKE").trim(),
+      authDomain: (process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || "web-ai-5a12f.firebaseapp.com").trim(),
+      projectId: (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "web-ai-5a12f").trim(),
+      storageBucket: (process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || "web-ai-5a12f.firebasestorage.app").trim(),
+      messagingSenderId: (process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || "698188933837").trim(),
+      appId: (process.env.NEXT_PUBLIC_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || "1:698188933837:web:7685dd8bb46fba22ec1784").trim()
+    };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(firebaseConfig));
+    return;
+  }
+
+  // -------------------------------------------------------------
   // POST /api/chat
   // -------------------------------------------------------------
   if (pathname === '/api/chat' && req.method === 'POST') {

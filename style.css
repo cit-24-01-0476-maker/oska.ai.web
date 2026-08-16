@@ -1530,12 +1530,12 @@ button, input, textarea, select {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: rgba(0, 0, 0, 0.25);
   backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 300;
   transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1554,6 +1554,7 @@ button, input, textarea, select {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  z-index: 310;
   animation: modalScaleUp 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1655,15 +1656,16 @@ button, input, textarea, select {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
   width: 90%;
-  max-width: 400px;
-  padding: 2.2rem 2rem 1.8rem;
+  max-width: 390px;
+  padding: 2rem 1.8rem 1.6rem;
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  z-index: 310;
   animation: modalScaleUp 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1697,20 +1699,22 @@ button, input, textarea, select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.3rem;
 }
 
-.auth-brand {
-  margin-bottom: 1rem;
-  text-decoration: none;
+.auth-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .auth-title {
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.01em;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.35rem;
 }
 
 .auth-subtitle {
