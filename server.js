@@ -612,6 +612,27 @@ const server = http.createServer(async (req, res) => {
         const latency = Date.now() - startTime;
         console.log(`[${requestId}] Completed ${result.provider} (${result.model}) in ${latency}ms`);
 
+        if (payload.stream) {
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            'Connection': 'keep-alive'
+          });
+
+          if (result.reasoning) {
+            res.write(`data: ${JSON.stringify({ type: 'reasoning', content: result.reasoning })}\n\n`);
+          }
+
+          const tokens = result.content.match(/\S+|\s+/g) || [result.content];
+          for (const token of tokens) {
+            res.write(`data: ${JSON.stringify({ type: 'text', content: token })}\n\n`);
+          }
+
+          res.write(`data: [DONE]\n\n`);
+          res.end();
+          return;
+        }
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           id: requestId,

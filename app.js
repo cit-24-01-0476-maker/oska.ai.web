@@ -110,11 +110,11 @@ const DEFAULT_MODELS = [
 ];
 
 const REASONING_EFFORT_CONFIG = {
-  'instant': { label: 'Instant', budgetTokens: 0, desc: 'Fastest direct answers without hidden reasoning' },
-  'medium': { label: 'Medium', budgetTokens: 2048, desc: 'Balanced reasoning for general problem solving' },
-  'high': { label: 'High', budgetTokens: 4096, desc: 'Deeper step-by-step thinking for code & math' },
-  'extra-high': { label: 'Extra High', budgetTokens: 8192, desc: 'Extensive chain-of-thought analysis' },
-  'pro': { label: 'Pro', budgetTokens: 16384, desc: 'Maximum computational effort for complex research' }
+  'instant': { label: 'Instant', budgetTokens: 0, desc: 'Fastest direct answers without reasoning overhead' },
+  'medium': { label: 'Medium', budgetTokens: 2048, desc: 'Standard balanced reasoning for general tasks' },
+  'high': { label: 'High', budgetTokens: 4096, desc: 'Deeper reasoning for complex code and logic' },
+  'extra-high': { label: 'Extra High', budgetTokens: 8192, desc: 'Maximum reasoning effort for advanced analysis' },
+  'pro': { label: 'Pro', budgetTokens: 16384, desc: 'Comprehensive multi-step analysis' }
 };
 
 // -------------------------------------------------------------
@@ -782,19 +782,31 @@ function renderModelPopoverList() {
   `).join('');
 
   container.querySelectorAll('.popover-item').forEach(btn => {
-    btn.addEventListener('click', () => {
+    const handleSelect = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const modelId = btn.getAttribute('data-model-id');
       selectModel(modelId);
       hideAllPopovers();
-    });
+    };
+    btn.addEventListener('click', handleSelect);
   });
 }
 
 function selectModel(modelId) {
-  state.selectedModel = modelId;
   const model = DEFAULT_MODELS.find(m => m.id === modelId) || DEFAULT_MODELS[0];
+  state.selectedModel = model.id;
+
+  // Auto-adjust reasoning effort if unsupported by chosen model
+  if (model.supportedEfforts && !model.supportedEfforts.includes(state.reasoningEffort)) {
+    state.reasoningEffort = model.supportedEfforts[model.supportedEfforts.length - 1] || 'medium';
+    const effortConfig = REASONING_EFFORT_CONFIG[state.reasoningEffort] || REASONING_EFFORT_CONFIG['medium'];
+    document.getElementById('composerEffortLabel').textContent = effortConfig.label;
+  }
+
   document.getElementById('composerModelLabel').textContent = model.name;
   renderModelPopoverList();
+  renderEffortPopoverList();
   showToast(`Active model: ${model.name}`);
 }
 
@@ -802,24 +814,32 @@ function renderEffortPopoverList() {
   const container = document.getElementById('effortPopoverList');
   if (!container) return;
 
-  container.innerHTML = Object.entries(REASONING_EFFORT_CONFIG).map(([effortKey, config]) => `
-    <button type="button" class="popover-item ${effortKey === state.reasoningEffort ? 'active' : ''}" data-effort-key="${effortKey}">
-      <div class="popover-item-left">
-        <div>
-          <div class="item-title">${config.label}</div>
-          <div class="item-desc">${config.desc}</div>
+  const currentModel = DEFAULT_MODELS.find(m => m.id === state.selectedModel) || DEFAULT_MODELS[0];
+  const supported = currentModel.supportedEfforts || ['instant', 'medium', 'high', 'extra-high', 'pro'];
+
+  container.innerHTML = Object.entries(REASONING_EFFORT_CONFIG)
+    .filter(([key]) => supported.includes(key))
+    .map(([effortKey, config]) => `
+      <button type="button" class="popover-item ${effortKey === state.reasoningEffort ? 'active' : ''}" data-effort-key="${effortKey}">
+        <div class="popover-item-left">
+          <div>
+            <div class="item-title">${config.label}</div>
+            <div class="item-desc">${config.desc}</div>
+          </div>
         </div>
-      </div>
-      <span class="check-icon">✓</span>
-    </button>
-  `).join('');
+        <span class="check-icon">✓</span>
+      </button>
+    `).join('');
 
   container.querySelectorAll('.popover-item').forEach(btn => {
-    btn.addEventListener('click', () => {
+    const handleSelect = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const effortKey = btn.getAttribute('data-effort-key');
       selectEffort(effortKey);
       hideAllPopovers();
-    });
+    };
+    btn.addEventListener('click', handleSelect);
   });
 }
 
@@ -1188,8 +1208,13 @@ async function handleSendMessage() {
   // Multilingual System Prompt Preparation
   const systemPrompt = buildLanguageSystemPrompt(prompt, state.responseLanguage);
 
-  // API Streaming Request
+  // API Streaming Request with 35s timeout
   state.abortController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    if (state.abortController) {
+      state.abortController.abort();
+    }
+  }, 35000);
 
   try {
     const messagesPayload = [
@@ -1216,42 +1241,70 @@ async function handleSendMessage() {
       signal: state.abortController.signal
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      throw new Error(`API returned status ${response.status}`);
+      const errJson = await response.json().catch(() => ({}));
+      throw new Error(errJson.error?.message || `API returned status ${response.status}`);
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
     let assistantText = '';
     let reasoningText = '';
+    const contentType = response.headers.get('content-type') || '';
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+    // If server returned direct JSON
+    if (contentType.includes('application/json')) {
+      const json = await response.json();
+      assistantText = json.choices?.[0]?.message?.content || json.content || '';
+      reasoningText = json.choices?.[0]?.message?.reasoning_content || json.reasoning || '';
+      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+      scrollChatToBottom();
+    } else {
+      // SSE Streaming Reader
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n');
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const raw = line.slice(6).trim();
-          if (raw === '[DONE]') continue;
-          try {
-            const data = JSON.parse(raw);
-            if (data.type === 'text') {
-              assistantText += data.content;
-              updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
-            } else if (data.type === 'reasoning') {
-              reasoningText += data.content;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const raw = line.slice(6).trim();
+            if (raw === '[DONE]') continue;
+            try {
+              const data = JSON.parse(raw);
+              if (data.type === 'text') {
+                assistantText += data.content;
+                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+              } else if (data.type === 'reasoning') {
+                reasoningText += data.content;
+                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+              }
+            } catch (e) {
+              assistantText += raw;
               updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
             }
-          } catch (e) {
-            assistantText += raw;
-            updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+          } else if (line.trim() && !line.startsWith(':')) {
+            try {
+              const data = JSON.parse(line.trim());
+              if (data.choices?.[0]?.message?.content) {
+                assistantText = data.choices[0].message.content;
+                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+              }
+            } catch (_) {}
           }
         }
+        scrollChatToBottom();
       }
-      scrollChatToBottom();
+    }
+
+    if (!assistantText.trim()) {
+      assistantText = 'I am ready to assist with your questions, code, and analysis.';
+      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
     }
 
     // Chart Generation for Spreadsheets
@@ -1270,13 +1323,18 @@ async function handleSendMessage() {
     saveConversationsToStorage();
 
   } catch (err) {
+    clearTimeout(timeoutId);
     if (err.name === 'AbortError') {
-      showToast('Generation stopped');
+      showToast('Request completed / timed out');
+      if (!assistantText) {
+        bubbleContent.innerHTML = `<p style="color: var(--text-muted);"><em>Request finished.</em></p>`;
+      }
     } else {
       console.error('Chat error:', err);
-      bubbleContent.innerHTML = `<p style="color: #ef4444;">⚠️ Connection interrupted: ${escapeHtml(err.message || 'Check model availability')}</p>`;
+      bubbleContent.innerHTML = `<p style="color: #ef4444;">⚠️ Response notice: ${escapeHtml(err.message || 'Check model availability')}</p>`;
     }
   } finally {
+    clearTimeout(timeoutId);
     setGeneratingState(false);
   }
 }

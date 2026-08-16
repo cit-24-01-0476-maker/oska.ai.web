@@ -581,6 +581,26 @@ module.exports = async (req, res) => {
       const latency = Date.now() - startTime;
       console.log(`[${requestId}] Completed ${result.provider} (${result.model}) in ${latency}ms`);
 
+      if (payload.stream) {
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.statusCode = 200;
+
+        if (result.reasoning) {
+          res.write(`data: ${JSON.stringify({ type: 'reasoning', content: result.reasoning })}\n\n`);
+        }
+
+        const tokens = result.content.match(/\S+|\s+/g) || [result.content];
+        for (const token of tokens) {
+          res.write(`data: ${JSON.stringify({ type: 'text', content: token })}\n\n`);
+        }
+
+        res.write(`data: [DONE]\n\n`);
+        res.end();
+        return;
+      }
+
       res.setHeader('Content-Type', 'application/json');
       res.statusCode = 200;
       res.end(JSON.stringify({
