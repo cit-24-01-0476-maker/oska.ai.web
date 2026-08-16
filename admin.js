@@ -330,6 +330,21 @@ async function checkExistingAdminSession() {
   }
 }
 
+function getTabFromUrl() {
+  const path = window.location.pathname.toLowerCase();
+  const match = path.match(/^\/admin\/([a-z0-9_-]+)/);
+  if (match && match[1]) {
+    const validTabs = ['overview', 'live', 'users', 'chats', 'search', 'usage', 'models', 'providers', 'files', 'projects', 'security', 'audit', 'system'];
+    if (validTabs.includes(match[1])) return match[1];
+  }
+  const hash = window.location.hash.replace('#', '').toLowerCase();
+  if (hash) {
+    const validTabs = ['overview', 'live', 'users', 'chats', 'search', 'usage', 'models', 'providers', 'files', 'projects', 'security', 'audit', 'system'];
+    if (validTabs.includes(hash)) return hash;
+  }
+  return 'overview';
+}
+
 function enterCommandCenter(adminInfo) {
   document.getElementById('adminAuthOverlay').classList.add('hidden');
   document.getElementById('adminAppLayout').classList.remove('hidden');
@@ -339,6 +354,10 @@ function enterCommandCenter(adminInfo) {
     document.getElementById('adminUserEmail').textContent = adminInfo.email || '';
     document.getElementById('adminUserInitial').textContent = (adminInfo.email || 'A')[0].toUpperCase();
   }
+
+  // Restore active tab from direct URL (e.g. /admin/users, /admin/models, /admin/system)
+  const initialTab = getTabFromUrl();
+  switchAdminTab(initialTab, false);
 
   // Load live data
   refreshAdminData();
@@ -355,13 +374,27 @@ function setupSidebarNavigation() {
   navItems.forEach(item => {
     item.addEventListener('click', () => {
       const tab = item.getAttribute('data-tab');
-      switchAdminTab(tab);
+      switchAdminTab(tab, true);
     });
+  });
+
+  window.addEventListener('popstate', () => {
+    if (adminState.authenticated) {
+      const tab = getTabFromUrl();
+      switchAdminTab(tab, false);
+    }
   });
 }
 
-function switchAdminTab(tabName) {
+function switchAdminTab(tabName, updateUrl = true) {
+  if (!tabName) tabName = 'overview';
   adminState.activeTab = tabName;
+
+  // Update browser URL without reload so refresh stays on this tab
+  if (updateUrl && window.history && window.history.replaceState) {
+    const newPath = tabName === 'overview' ? '/admin' : `/admin/${tabName}`;
+    window.history.replaceState({ tab: tabName }, '', newPath);
+  }
 
   // Update active nav button
   document.querySelectorAll('.nav-item').forEach(item => {

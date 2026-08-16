@@ -52,6 +52,20 @@ assert(Boolean(validatedSession && validatedSession.email === 'oshadhaperera500@
 const mockReqInvalid = { headers: {} };
 assert(adminService.requireAdminAccess(mockReqInvalid) === null, 'requireAdminAccess rejects unauthenticated request');
 
+// Mock request with Authorization Bearer header
+const mockReqBearer = {
+  headers: {
+    authorization: `Bearer ${rawToken}`
+  }
+};
+const validatedBearerSession = adminService.requireAdminAccess(mockReqBearer);
+assert(Boolean(validatedBearerSession && validatedBearerSession.email === 'oshadhaperera500@gmail.com'), 'requireAdminAccess successfully authorizes valid Bearer header');
+
+// Test tampered token rejection
+const tamperedToken = rawToken.slice(0, -4) + 'abcd';
+const mockReqTampered = { headers: { authorization: `Bearer ${tamperedToken}` } };
+assert(adminService.requireAdminAccess(mockReqTampered) === null, 'requireAdminAccess rejects tampered HMAC token');
+
 // 3. Test Observability & Ledger Recorders
 console.log('\n--- 3. Observability & Ledger Recording ---');
 adminService.recordUsage({
@@ -99,6 +113,10 @@ console.log('\n--- 5. System Settings & Maintenance Flags ---');
 adminService.systemSettings.maintenanceEnabled = true;
 adminService.systemSettings.maintenanceMessage = 'Custom scheduled maintenance';
 assert(adminService.systemSettings.maintenanceEnabled === true, 'Maintenance mode set');
+
+// Test Admin bypass during maintenance
+const adminUserAccess = adminService.requireAdminAccess(mockReqValid);
+assert(Boolean(adminUserAccess), 'Admin user retains full access during maintenance');
 
 adminService.recordAudit('MAINTENANCE_ENABLED', 'oshadhaperera500@gmail.com', 'SYSTEM', 'MAINTENANCE', { test: true });
 assert(adminService.auditLedger.some(a => a.action === 'MAINTENANCE_ENABLED'), 'Audit log written for maintenance change');

@@ -596,7 +596,7 @@ const server = http.createServer(async (req, res) => {
   // -------------------------------------------------------------
   // Server-Enforced Maintenance & Emergency Stop Check for AI APIs
   // -------------------------------------------------------------
-  if (['/api/chat', '/api/search', '/api/images/generate', '/api/videos/generate'].some(p => pathname.includes(p))) {
+  if (['/api/chat', '/api/search', '/api/research', '/api/images', '/api/videos', '/api/data', '/api/upload', '/api/files'].some(p => pathname.includes(p))) {
     const isAdmin = Boolean(adminService.requireAdminAccess(req));
     if (!isAdmin) {
       if (adminService.systemSettings.maintenanceEnabled) {
