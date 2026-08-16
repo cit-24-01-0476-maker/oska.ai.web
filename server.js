@@ -27,7 +27,7 @@ function loadEnv() {
 loadEnv();
 
 const PORT = process.env.PORT || 3000;
-const PUBLIC_DIR = __dirname;
+const PUBLIC_DIR = fs.existsSync(path.join(__dirname, 'public')) ? path.join(__dirname, 'public') : __dirname;
 
 // Centralized Model Registry
 const MODEL_CATALOG = [
