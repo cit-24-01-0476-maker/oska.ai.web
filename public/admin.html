@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>oska.AI — Secure Admin Command Center</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+  <!-- Toast Notification Container -->
+  <div class="admin-toast-container" id="adminToastContainer"></div>
+
+  <!-- -------------------------------------------------------------
+       1. Dedicated Admin 2FA Authentication Gate
+       ------------------------------------------------------------- -->
+  <div class="admin-auth-overlay" id="adminAuthOverlay">
+    <div class="admin-gate-card">
+      <div class="gate-shield-badge">
+        <i data-lucide="shield-check" style="width: 28px; height: 28px; color: var(--accent-primary);"></i>
+      </div>
+      <div class="gate-brand-title">oska.AI</div>
+      <div class="gate-badge-label">COMMAND CENTER · LEVEL 2 ACCESS</div>
+
+      <!-- Step 1: Google Identity Verification -->
+      <div class="gate-step-view" id="gateGoogleStep">
+        <h2 class="gate-heading">Administrator Authentication</h2>
+        <p class="gate-subtext">Sign in with the authorized administrator Google account to request command center access.</p>
+
+        <button type="button" class="gate-google-btn" id="adminGoogleSignInBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span id="adminGoogleBtnText">Verify with Google</span>
+        </button>
+        <div class="gate-error-message hidden" id="gateGoogleError"></div>
+        <div class="gate-footer-note">All unauthorized access attempts are logged with client IP.</div>
+      </div>
+
+      <!-- Step 2: 6-Digit Admin Access Code Challenge -->
+      <div class="gate-step-view hidden" id="gateCodeStep">
+        <div class="gate-user-pill">
+          <div class="user-pill-dot"></div>
+          <span class="user-pill-email" id="gateVerifiedEmail">admin@oska.ai</span>
+        </div>
+        <h2 class="gate-heading">Enter Access Code</h2>
+        <p class="gate-subtext">Enter your 6-digit cryptographic security PIN.</p>
+
+        <form id="adminPinForm" class="gate-pin-form" onsubmit="handlePinSubmit(event)">
+          <div class="pin-inputs-row" id="pinInputsRow">
+            <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" autofocus data-idx="0">
+            <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" data-idx="1">
+            <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" data-idx="2">
+            <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" data-idx="3">
+            <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" data-idx="4">
+            <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" data-idx="5">
+          </div>
+
+          <button type="submit" class="gate-submit-btn" id="unlockAdminBtn">
+            <i data-lucide="lock-open" style="width: 16px; height: 16px;"></i>
+            <span>Unlock Command Center</span>
+          </button>
+        </form>
+
+        <div class="gate-error-message hidden" id="gateCodeError"></div>
+        <div class="gate-switch-row">
+          <button type="button" class="gate-text-link" onclick="switchAdminGoogleAccount()">Use another account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -------------------------------------------------------------
+       2. Dedicated Admin Command Center Workspace
+       ------------------------------------------------------------- -->
+  <div class="admin-app-layout hidden" id="adminAppLayout">
+    <!-- Sidebar Backdrop for Mobile -->
+    <div class="admin-sidebar-backdrop hidden" id="adminSidebarBackdrop"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <div class="admin-sidebar-header">
+        <div class="sidebar-brand-group">
+          <div class="brand-badge-box">O</div>
+          <div>
+            <div class="brand-name-text">oska.AI</div>
+            <div class="brand-sub-tag">COMMAND CENTER</div>
+          </div>
+        </div>
+        <div class="admin-status-pill">
+          <span class="pulse-green"></span>
+          <span>ADMIN 2FA SECURED</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="admin-nav-menu">
+        <div class="nav-section-title">CORE PLATFORM</div>
+        <button type="button" class="nav-item active" data-tab="overview">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Overview</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="live">
+          <i data-lucide="activity"></i>
+          <span>Live Presence</span>
+          <span class="nav-count-badge" id="navLiveCount">1</span>
+        </button>
+
+        <div class="nav-section-title">MANAGEMENT</div>
+        <button type="button" class="nav-item" data-tab="users">
+          <i data-lucide="users"></i>
+          <span>Users</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="chats">
+          <i data-lucide="message-square"></i>
+          <span>Chats</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="search">
+          <i data-lucide="search"></i>
+          <span>Search Activity</span>
+        </button>
+
+        <div class="nav-section-title">AI & INFRASTRUCTURE</div>
+        <button type="button" class="nav-item" data-tab="usage">
+          <i data-lucide="trending-up"></i>
+          <span>Usage & Tokens</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="models">
+          <i data-lucide="cpu"></i>
+          <span>Models</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="providers">
+          <i data-lucide="server"></i>
+          <span>Providers & Gateway</span>
+        </button>
+
+        <div class="nav-section-title">GOVERNANCE & OPS</div>
+        <button type="button" class="nav-item" data-tab="files">
+          <i data-lucide="file-text"></i>
+          <span>Files & Storage</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="projects">
+          <i data-lucide="folder"></i>
+          <span>Projects</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="security">
+          <i data-lucide="shield-alert"></i>
+          <span>Security & Gate</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="audit">
+          <i data-lucide="scroll-text"></i>
+          <span>Audit Logs</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="system">
+          <i data-lucide="settings-2"></i>
+          <span>System & Maintenance</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="admin-sidebar-footer">
+        <div class="admin-profile-row">
+          <div class="admin-avatar-box" id="adminUserInitial">A</div>
+          <div class="admin-profile-info">
+            <div class="admin-profile-name" id="adminUserName">Administrator</div>
+            <div class="admin-profile-email" id="adminUserEmail">admin@oska.ai</div>
+          </div>
+        </div>
+        <div class="sidebar-action-buttons">
+          <button type="button" class="footer-action-btn lock" onclick="lockAdminSession()" title="Lock Admin session">
+            <i data-lucide="lock" style="width: 14px; height: 14px;"></i>
+            <span>Lock</span>
+          </button>
+          <button type="button" class="footer-action-btn signout" onclick="signOutAdmin()" title="Sign out completely">
+            <i data-lucide="log-out" style="width: 14px; height: 14px;"></i>
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Area -->
+    <div class="admin-main-viewport">
+      <!-- Top Command Bar -->
+      <header class="admin-top-bar">
+        <div class="top-bar-left">
+          <button type="button" class="sidebar-mobile-toggle" id="adminMobileToggle" aria-label="Toggle sidebar">
+            <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
+          </button>
+          <h1 class="view-title-text" id="adminViewTitle">Overview</h1>
+        </div>
+
+        <div class="top-bar-right">
+          <!-- Maintenance Quick Badge -->
+          <div class="quick-maintenance-badge" id="quickMaintenanceBadge" onclick="switchAdminTab('system')">
+            <span class="m-dot"></span>
+            <span id="quickMaintenanceText">Maintenance: OFF</span>
+          </div>
+
+          <!-- Date Filter Dropdown -->
+          <select id="adminDateRangeFilter" class="admin-select-input" onchange="refreshAdminData()">
+            <option value="today">Today</option>
+            <option value="24h" selected>Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
+
+          <!-- Export CSV -->
+          <button type="button" class="top-btn" onclick="exportAdminData()" title="Export CSV Report">
+            <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+            <span class="btn-label-desk">Export</span>
+          </button>
+
+          <!-- Refresh Button -->
+          <button type="button" class="top-btn primary" onclick="refreshAdminData()" id="adminRefreshBtn" title="Refresh Live Data">
+            <i data-lucide="refresh-cw" style="width: 14px; height: 14px;" id="refreshIcon"></i>
+            <span class="btn-label-desk">Refresh</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Main View Content -->
+      <main class="admin-content-area" id="adminContentArea">
+        
+        <!-- -------------------------------------------------------
+             TAB 1: OVERVIEW
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane active" id="pane-overview">
+          <!-- Top KPI Grid (Real Data) -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">TOTAL USERS</span>
+                <i data-lucide="users" class="kpi-icon"></i>
+              </div>
+              <div class="kpi-value" id="kpiTotalUsers">0</div>
+              <div class="kpi-footer text-green">Real Firebase Directory</div>
+            </div>
+
+            <div class="kpi-card highlight-green">
+              <div class="kpi-header">
+                <span class="kpi-title">ONLINE NOW</span>
+                <i data-lucide="radio" class="kpi-icon text-green"></i>
+              </div>
+              <div class="kpi-value text-green" id="kpiOnlineNow">1</div>
+              <div class="kpi-footer">Active Heartbeats</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">ACTIVE TODAY</span>
+                <i data-lucide="user-check" class="kpi-icon"></i>
+              </div>
+              <div class="kpi-value" id="kpiActiveToday">0</div>
+              <div class="kpi-footer text-muted">Daily Active Sessions</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">AI REQUESTS</span>
+                <i data-lucide="sparkles" class="kpi-icon text-accent"></i>
+              </div>
+              <div class="kpi-value text-accent" id="kpiTotalRequests">0</div>
+              <div class="kpi-footer">Across all providers</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">TOTAL TOKENS</span>
+                <i data-lucide="database" class="kpi-icon"></i>
+              </div>
+              <div class="kpi-value" id="kpiTotalTokens">0</div>
+              <div class="kpi-footer">Input + Output tokens</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">WEB SEARCHES</span>
+                <i data-lucide="globe" class="kpi-icon"></i>
+              </div>
+              <div class="kpi-value" id="kpiTotalSearches">0</div>
+              <div class="kpi-footer">Live & Deep Research</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">AVG LATENCY</span>
+                <i data-lucide="zap" class="kpi-icon"></i>
+              </div>
+              <div class="kpi-value" id="kpiAvgLatency">0ms</div>
+              <div class="kpi-footer text-muted">Time to complete</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">GATEWAY ERRORS</span>
+                <i data-lucide="alert-circle" class="kpi-icon"></i>
+              </div>
+              <div class="kpi-value" id="kpiTotalErrors">0</div>
+              <div class="kpi-footer text-green">0.0% Error Rate</div>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="charts-row">
+            <div class="chart-card flex-2">
+              <div class="chart-header">
+                <div class="chart-title">AI Request Volume & Token Throughput</div>
+                <span class="chart-subtitle">Real-time gateway event ledger</span>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="overviewActivityChart"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card flex-1">
+              <div class="chart-header">
+                <div class="chart-title">Workspace Tool Usage</div>
+                <span class="chart-subtitle">By capability</span>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="overviewToolsChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tables Row -->
+          <div class="tables-split-row">
+            <div class="dashboard-panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="shield" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+                  <span>Recent Security & Audit Logs</span>
+                </div>
+                <button type="button" class="panel-link" onclick="switchAdminTab('audit')">View all</button>
+              </div>
+              <div class="panel-table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Action</th>
+                      <th>Admin</th>
+                      <th>Target</th>
+                    </tr>
+                  </thead>
+                  <tbody id="overviewAuditTableBody">
+                    <tr><td colspan="4" class="text-center text-muted">Loading audit ledger...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="dashboard-panel">
+              <div class="panel-header">
+                <div class="panel-title">
+                  <i data-lucide="server" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+                  <span>AI Provider Gateway Health</span>
+                </div>
+                <button type="button" class="panel-link" onclick="switchAdminTab('providers')">Manage</button>
+              </div>
+              <div class="provider-status-grid" id="overviewProviderStatusGrid">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 2: LIVE PRESENCE
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-live">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Active Live Sessions</h2>
+              <p class="pane-subtitle">Real-time presence tracking via active websocket and client heartbeats.</p>
+            </div>
+            <div class="live-counter-tag">
+              <span class="pulse-green"></span>
+              <span id="liveActiveCountLabel">1 Active Session</span>
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Device</th>
+                    <th>Active Area</th>
+                    <th>Current Activity</th>
+                    <th>Connections</th>
+                    <th>Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody id="livePresenceTableBody">
+                  <tr><td colspan="7" class="text-center text-muted">Polling live presence...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 3: USERS
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-users">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">User Directory</h2>
+              <p class="pane-subtitle">Manage registered users, inspect token consumption, and control platform access.</p>
+            </div>
+            <div class="pane-action-bar">
+              <input type="text" class="admin-search-input" id="userSearchInput" placeholder="Search by name, email, or UID..." oninput="filterUsersTable()">
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Total Requests</th>
+                    <th>Token Usage</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <tr><td colspan="8" class="text-center text-muted">Loading user directory...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 4: CHATS
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-chats">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Conversation Metadata</h2>
+              <p class="pane-subtitle">Inspect thread metadata and conversation activity without compromising private content.</p>
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Chat ID</th>
+                    <th>Owner</th>
+                    <th>Title</th>
+                    <th>Messages</th>
+                    <th>Model</th>
+                    <th>Created</th>
+                    <th>Inspection</th>
+                  </tr>
+                </thead>
+                <tbody id="chatsTableBody">
+                  <tr><td colspan="7" class="text-center text-muted">Loading conversations...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 5: SEARCH ACTIVITY
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-search">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Search & Research Ledger</h2>
+              <p class="pane-subtitle">Real-time audit of live web crawler requests and multi-source deep research dossiers.</p>
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Tool</th>
+                    <th>Query / Topic</th>
+                    <th>Provider</th>
+                    <th>Status</th>
+                    <th>Sources</th>
+                    <th>Latency</th>
+                  </tr>
+                </thead>
+                <tbody id="searchTableBody">
+                  <tr><td colspan="8" class="text-center text-muted">Loading search ledger...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 6: USAGE & TOKENS
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-usage">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">AI Token & Request Ledger</h2>
+              <p class="pane-subtitle">Detailed immutable audit of all model inferences, latency profiles, and token counts.</p>
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Provider</th>
+                    <th>Model</th>
+                    <th>Tool</th>
+                    <th>Tokens</th>
+                    <th>Latency</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="usageTableBody">
+                  <tr><td colspan="8" class="text-center text-muted">Loading usage ledger...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 7: MODELS
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-models">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Model Management</h2>
+              <p class="pane-subtitle">Enable, disable, configure default routing, and manage capabilities per model.</p>
+            </div>
+          </div>
+
+          <div class="models-admin-grid" id="modelsAdminGrid">
+            <!-- Dynamically populated model cards -->
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 8: PROVIDERS
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-providers">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Provider Kill Switches & Health</h2>
+              <p class="pane-subtitle">Live status and instant server-enforced emergency kill switches per AI provider.</p>
+            </div>
+          </div>
+
+          <div class="providers-admin-grid" id="providersAdminGrid">
+            <!-- Dynamically populated provider cards -->
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 9: FILES & STORAGE
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-files">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Uploaded Files & Knowledge Storage</h2>
+              <p class="pane-subtitle">Metadata overview of user-uploaded documents, spreadsheets, and presentation files.</p>
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>File ID</th>
+                    <th>Filename</th>
+                    <th>Type</th>
+                    <th>Size</th>
+                    <th>Uploaded At</th>
+                  </tr>
+                </thead>
+                <tbody id="filesTableBody">
+                  <tr><td colspan="5" class="text-center text-muted">Loading files metadata...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 10: PROJECTS
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-projects">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Workspace Projects</h2>
+              <p class="pane-subtitle">Track custom project workspaces, knowledge base associations, and chats.</p>
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Project ID</th>
+                    <th>Project Name</th>
+                    <th>Sources</th>
+                    <th>Chats</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="projectsTableBody">
+                  <tr><td colspan="5" class="text-center text-muted">Loading projects metadata...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 11: SECURITY & GATE
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-security">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Security & Access Defense</h2>
+              <p class="pane-subtitle">Audit of failed login attempts, access code challenges, rate limit triggers, and lockouts.</p>
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Security Event</th>
+                    <th>Origin / IP</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody id="securityTableBody">
+                  <tr><td colspan="4" class="text-center text-muted">Loading security events...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 12: AUDIT LOGS
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-audit">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">Comprehensive Audit Logs</h2>
+              <p class="pane-subtitle">Tamper-evident log of every administrative mutation and security event.</p>
+            </div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="panel-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Admin</th>
+                    <th>Target Type</th>
+                    <th>Target ID</th>
+                    <th>Metadata</th>
+                  </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                  <tr><td colspan="6" class="text-center text-muted">Loading audit ledger...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- -------------------------------------------------------
+             TAB 13: SYSTEM & MAINTENANCE
+             ------------------------------------------------------- -->
+        <section class="admin-tab-pane" id="pane-system">
+          <div class="pane-header-row">
+            <div>
+              <h2 class="pane-title">System & Maintenance Controls</h2>
+              <p class="pane-subtitle">Global feature flags, maintenance mode scheduler, and emergency controls.</p>
+            </div>
+          </div>
+
+          <!-- System Controls Grid -->
+          <div class="system-controls-grid">
+            <!-- Maintenance Mode Card -->
+            <div class="control-card highlight-border">
+              <div class="control-card-header">
+                <div class="control-title-group">
+                  <i data-lucide="wrench" style="width: 20px; height: 20px; color: var(--accent-primary);"></i>
+                  <div>
+                    <div class="control-name">Platform Maintenance Mode</div>
+                    <div class="control-desc">Blocks normal user AI operations while preserving /admin access for testing.</div>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sysMaintenanceToggle" onchange="toggleMaintenanceMode(this.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="control-body">
+                <div class="form-group">
+                  <label class="form-label">User Maintenance Message</label>
+                  <input type="text" class="admin-text-input" id="sysMaintenanceMsgInput" value="oska.AI is currently undergoing scheduled maintenance. We'll be back shortly.">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Estimated Completion Time (Optional)</label>
+                  <input type="datetime-local" class="admin-text-input" id="sysMaintenanceEndInput">
+                </div>
+                <button type="button" class="btn-save" onclick="saveMaintenanceSettings()">Save Maintenance Notice</button>
+              </div>
+            </div>
+
+            <!-- Emergency AI Stop Card -->
+            <div class="control-card">
+              <div class="control-card-header">
+                <div class="control-title-group">
+                  <i data-lucide="octagon-alert" style="width: 20px; height: 20px; color: #ef4444;"></i>
+                  <div>
+                    <div class="control-name">Emergency AI Request Pause</div>
+                    <div class="control-desc">Instantly halt all incoming AI generation requests across all providers.</div>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sysEmergencyStopToggle" onchange="toggleEmergencyAiStop(this.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Search Query Privacy -->
+            <div class="control-card">
+              <div class="control-card-header">
+                <div class="control-title-group">
+                  <i data-lucide="eye-off" style="width: 20px; height: 20px; color: var(--accent-primary);"></i>
+                  <div>
+                    <div class="control-name">Search Query Text Logging</div>
+                    <div class="control-desc">When disabled, search analytics record only metadata without query text.</div>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sysStoreSearchQueriesToggle" checked onchange="toggleSearchPrivacy(this.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Feature Flags Section -->
+          <div class="dashboard-panel" style="margin-top: 1.5rem;">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i data-lucide="toggle-right" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+                <span>Global Workspace Feature Flags</span>
+              </div>
+            </div>
+            <div class="feature-flags-grid" id="featureFlagsGrid">
+              <!-- Dynamically populated feature flags -->
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

@@ -141,12 +141,6 @@
             <span>Appearance</span>
           </div>
         </button>
-        <button type="button" class="popover-item" id="menuAdminBtn" style="display: none;">
-          <div class="popover-item-left">
-            <i data-lucide="shield-check" style="width: 15px; height: 15px; color: var(--accent-primary);"></i>
-            <span>Admin Console</span>
-          </div>
-        </button>
         <button type="button" class="popover-item hidden" id="menuSignOutBtn">
           <div class="popover-item-left">
             <i data-lucide="log-out" style="width: 15px; height: 15px; color: #ef4444;"></i>
@@ -570,65 +564,6 @@
             <span id="googleSignInBtnText">Continue with Google</span>
           </button>
           <button type="button" class="auth-dismiss-link" id="loginDismissBtn">Maybe later</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Admin Panel Modal -->
-    <div class="modal-overlay hidden" id="adminModal" role="dialog" aria-modal="true" aria-labelledby="adminDialogTitle">
-      <div class="settings-dialog admin-dialog">
-        <div class="dialog-header">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <i data-lucide="shield-check" style="color: var(--accent-primary);"></i>
-            <h2 class="dialog-title" id="adminDialogTitle">oska.AI Admin Console</h2>
-          </div>
-          <button type="button" class="icon-btn" id="closeAdminBtn" aria-label="Close Admin">
-            <i data-lucide="x" style="width: 18px; height: 18px;"></i>
-          </button>
-        </div>
-        <div class="dialog-body">
-          <div class="admin-metrics-grid">
-            <div class="metric-card">
-              <div class="metric-val" id="metricTotalChats">0</div>
-              <div class="metric-label">Active Chats</div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-val" id="metricActiveProvider">5/5</div>
-              <div class="metric-label">Providers Online</div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-val" id="metricAuthStatus">Active</div>
-              <div class="metric-label">Firebase Auth</div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-val" id="metricAppVersion">V1.0</div>
-              <div class="metric-label">Platform Release</div>
-            </div>
-          </div>
-
-          <h3 class="admin-section-title">Connected AI Provider Gateway</h3>
-          <div class="admin-provider-list" id="adminProviderList">
-            <div class="admin-provider-row">
-              <span class="provider-name">Google Gemini (3.7 / 3.5 Flash)</span>
-              <span class="provider-status online">Available</span>
-            </div>
-            <div class="admin-provider-row">
-              <span class="provider-name">OpenAI (GPT-4o / GPT-4o-mini)</span>
-              <span class="provider-status online">Available</span>
-            </div>
-            <div class="admin-provider-row">
-              <span class="provider-name">Groq LPU (Llama 3.3 70B & Qwen)</span>
-              <span class="provider-status online">Available</span>
-            </div>
-            <div class="admin-provider-row">
-              <span class="provider-name">OpenRouter Universal Hub</span>
-              <span class="provider-status online">Available</span>
-            </div>
-            <div class="admin-provider-row">
-              <span class="provider-name">DeepSeek R1 Reasoner</span>
-              <span class="provider-status online">Available</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

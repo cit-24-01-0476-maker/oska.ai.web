@@ -769,13 +769,6 @@ function setupAuthListeners() {
       updateUserProfileUI(user);
       loadSavedConversations();
       renderConversationsList();
-
-      // Check admin privileges
-      const adminEmails = ['oshadhaperer@gmail.com', 'cit24010476@gmail.com'];
-      const menuAdminBtn = document.getElementById('menuAdminBtn');
-      if (menuAdminBtn) {
-        menuAdminBtn.style.display = (user && adminEmails.includes(user.email)) ? 'flex' : 'none';
-      }
     });
   }
 
@@ -1169,18 +1162,6 @@ function setupUIEventListeners() {
       hideAllPopovers();
       showToast(`Switched to ${state.theme === 'light' ? 'Light' : 'Dark'} theme`);
     });
-  }
-
-  // Admin Console Modal
-  if (menuAdminBtn) {
-    menuAdminBtn.addEventListener('click', () => {
-      hideAllPopovers();
-      document.getElementById('adminModal').classList.remove('hidden');
-      document.getElementById('metricTotalChats').textContent = state.conversations.length;
-    });
-  }
-  if (closeAdminBtn) {
-    closeAdminBtn.addEventListener('click', () => document.getElementById('adminModal').classList.add('hidden'));
   }
 
   // Clear History

@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const crypto = require('crypto');
+const adminService = require('./admin-service');
 
 // Load environment variables from .env file
 function loadEnv() {
@@ -551,6 +552,76 @@ const server = http.createServer(async (req, res) => {
 
   const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = parsedUrl.pathname;
+
+  // Helper to parse JSON body
+  const getRequestBody = (r) => new Promise((resolve) => {
+    let body = '';
+    r.on('data', chunk => body += chunk);
+    r.on('end', () => {
+      try {
+        resolve(JSON.parse(body || '{}'));
+      } catch (_) {
+        resolve({});
+      }
+    });
+  });
+
+  // -------------------------------------------------------------
+  // Dedicated Admin Command Center HTML Serving (/admin)
+  // -------------------------------------------------------------
+  if (pathname === '/admin' || pathname === '/admin/' || pathname.startsWith('/admin/') || pathname === '/admin.html') {
+    const adminHtmlPath = fs.existsSync(path.join(PUBLIC_DIR, 'admin.html')) 
+      ? path.join(PUBLIC_DIR, 'admin.html') 
+      : path.join(__dirname, 'admin.html');
+    if (fs.existsSync(adminHtmlPath)) {
+      const content = fs.readFileSync(adminHtmlPath);
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Frame-Options': 'DENY',
+        'X-Content-Type-Options': 'nosniff'
+      });
+      res.end(content);
+      return;
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Dedicated Admin Command Center Routing & Security (/api/admin/*)
+  // -------------------------------------------------------------
+  if (pathname.startsWith('/api/admin') || pathname === '/api/presence/heartbeat') {
+    const handled = await adminService.handleAdminRequest(pathname, req, res, getRequestBody);
+    if (handled) return;
+  }
+
+  // -------------------------------------------------------------
+  // Server-Enforced Maintenance & Emergency Stop Check for AI APIs
+  // -------------------------------------------------------------
+  if (['/api/chat', '/api/search', '/api/images/generate', '/api/videos/generate'].some(p => pathname.includes(p))) {
+    const isAdmin = Boolean(adminService.requireAdminAccess(req));
+    if (!isAdmin) {
+      if (adminService.systemSettings.maintenanceEnabled) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          error: {
+            message: adminService.systemSettings.maintenanceMessage || "oska.AI is currently undergoing scheduled maintenance. Please try again shortly.",
+            code: 'MAINTENANCE_MODE',
+            maintenanceEndAt: adminService.systemSettings.maintenanceEndAt
+          }
+        }));
+        return;
+      }
+      if (adminService.systemSettings.emergencyAiStop) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          error: {
+            message: "Emergency AI request pause is active. Existing history and files are available, but new AI generations are temporarily paused.",
+            code: 'EMERGENCY_AI_STOP'
+          }
+        }));
+        return;
+      }
+    }
+  }
 
   // -------------------------------------------------------------
   // GET /api/models

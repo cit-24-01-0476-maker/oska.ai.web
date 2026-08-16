@@ -5,6 +5,7 @@
 
 const https = require('https');
 const crypto = require('crypto');
+const adminService = require('./admin-service');
 
 // Centralized Model Registry
 const MODEL_CATALOG = [
@@ -524,6 +525,46 @@ module.exports = async (req, res) => {
 
   const url = req.url || '/';
   const pathname = url.split('?')[0];
+
+  // -------------------------------------------------------------
+  // Dedicated Admin Command Center Routing & Security
+  // -------------------------------------------------------------
+  if (pathname.startsWith('/api/admin') || pathname === '/api/presence/heartbeat') {
+    const handled = await adminService.handleAdminRequest(pathname, req, res, getRequestBody);
+    if (handled) return;
+  }
+
+  // -------------------------------------------------------------
+  // Server-Enforced Maintenance & Emergency Stop Check for AI APIs
+  // -------------------------------------------------------------
+  if (['/api/chat', '/api/search', '/api/images/generate', '/api/videos/generate'].some(p => pathname.includes(p))) {
+    const isAdmin = Boolean(adminService.requireAdminAccess(req));
+    if (!isAdmin) {
+      if (adminService.systemSettings.maintenanceEnabled) {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          error: {
+            message: adminService.systemSettings.maintenanceMessage || "oska.AI is currently undergoing scheduled maintenance. Please try again shortly.",
+            code: 'MAINTENANCE_MODE',
+            maintenanceEndAt: adminService.systemSettings.maintenanceEndAt
+          }
+        }));
+        return;
+      }
+      if (adminService.systemSettings.emergencyAiStop) {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          error: {
+            message: "Emergency AI request pause is active. Existing history and files are available, but new AI generations are temporarily paused.",
+            code: 'EMERGENCY_AI_STOP'
+          }
+        }));
+        return;
+      }
+    }
+  }
 
   // -------------------------------------------------------------
   // GET /api/models
