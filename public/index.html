@@ -31,6 +31,9 @@
 </head>
 <body>
   <div class="app-container">
+    <!-- Transparent Popover Backdrop for Outside-Click (Zero Blur on Desktop) -->
+    <div class="popover-backdrop hidden" id="popoverBackdrop"></div>
+
     <!-- Mobile Sidebar Backdrop -->
     <div class="sidebar-backdrop hidden" id="sidebarBackdrop"></div>
 
@@ -70,7 +73,7 @@
       <!-- Sidebar Footer / Account Menu -->
       <div class="sidebar-footer">
         <!-- User Profile Pill -->
-        <button type="button" class="user-profile-btn" id="userProfileBtn" aria-label="User Account">
+        <button type="button" class="user-profile-btn" id="userProfileBtn" aria-haspopup="true" aria-expanded="false" aria-label="User Account">
           <div class="avatar-circle" id="userAvatar">U</div>
           <div class="user-info-text">
             <span class="user-display-name" id="userDisplayName">Guest User</span>
@@ -89,6 +92,49 @@
         </div>
       </div>
     </aside>
+
+    <!-- Sidebar Account Dropdown Popover (Opens Upward Above Profile Button) -->
+    <div class="account-popover hidden" id="accountPopover" role="menu" aria-label="Account Menu">
+      <div class="account-profile-header">
+        <div class="avatar-large" id="menuUserAvatar">U</div>
+        <div>
+          <div class="menu-user-name" id="menuUserName">Guest User</div>
+          <div class="menu-user-email" id="menuUserEmail">guest@oska.ai</div>
+        </div>
+      </div>
+      <div class="popover-scroll-list">
+        <button type="button" class="popover-item" id="menuLoginBtn">
+          <div class="popover-item-left">
+            <i data-lucide="log-in" style="width: 15px; height: 15px;"></i>
+            <span>Sign in with Google</span>
+          </div>
+        </button>
+        <button type="button" class="popover-item" id="menuSettingsBtn">
+          <div class="popover-item-left">
+            <i data-lucide="settings" style="width: 15px; height: 15px;"></i>
+            <span>Settings</span>
+          </div>
+        </button>
+        <button type="button" class="popover-item" id="menuThemeBtn">
+          <div class="popover-item-left">
+            <i data-lucide="sun-moon" style="width: 15px; height: 15px;"></i>
+            <span>Appearance</span>
+          </div>
+        </button>
+        <button type="button" class="popover-item" id="menuAdminBtn" style="display: none;">
+          <div class="popover-item-left">
+            <i data-lucide="shield-check" style="width: 15px; height: 15px; color: var(--accent-primary);"></i>
+            <span>Admin Console</span>
+          </div>
+        </button>
+        <button type="button" class="popover-item hidden" id="menuSignOutBtn">
+          <div class="popover-item-left">
+            <i data-lucide="log-out" style="width: 15px; height: 15px; color: #ef4444;"></i>
+            <span style="color: #ef4444;">Sign Out</span>
+          </div>
+        </button>
+      </div>
+    </div>
 
     <!-- Main Workspace -->
     <main class="main-workspace">
@@ -156,6 +202,118 @@
 
       <!-- Claude-Inspired Floating Chat Composer -->
       <div class="composer-container">
+        <!-- Direct Floating Composer Popovers -->
+        <!-- Direct Model Picker Popover -->
+        <div class="composer-popover hidden" id="composerModelPopover" role="menu" aria-label="Select AI Model">
+          <div class="popover-header">AI MODELS</div>
+          <div class="popover-scroll-list" id="modelPopoverList">
+            <!-- Dynamically rendered -->
+          </div>
+        </div>
+
+        <!-- Direct Reasoning Effort Popover -->
+        <div class="composer-popover hidden" id="composerEffortPopover" role="menu" aria-label="Select Reasoning Effort">
+          <div class="popover-header">REASONING EFFORT</div>
+          <div class="popover-scroll-list" id="effortPopoverList">
+            <!-- Dynamically rendered -->
+          </div>
+        </div>
+
+        <!-- Tools Menu Popover -->
+        <div class="composer-popover hidden" id="toolsPopover" role="menu" aria-label="Workspace Tools">
+          <div class="popover-header">WORKSPACE TOOLS</div>
+          <div class="popover-scroll-list">
+            <button type="button" class="popover-item" id="toolWebSearchBtn">
+              <div class="popover-item-left">
+                <i data-lucide="globe" style="width: 15px; height: 15px;"></i>
+                <div>
+                  <div class="item-title">Web Search</div>
+                  <div class="item-desc">Live search with real source citations</div>
+                </div>
+              </div>
+            </button>
+            <button type="button" class="popover-item" id="toolResearchBtn">
+              <div class="popover-item-left">
+                <i data-lucide="book-open-check" style="width: 15px; height: 15px;"></i>
+                <div>
+                  <div class="item-title">Deep Research</div>
+                  <div class="item-desc">Multi-source structured investigation</div>
+                </div>
+              </div>
+            </button>
+            <button type="button" class="popover-item" id="toolDataAnalysisBtn">
+              <div class="popover-item-left">
+                <i data-lucide="line-chart" style="width: 15px; height: 15px;"></i>
+                <div>
+                  <div class="item-title">Data & Chart Analysis</div>
+                  <div class="item-desc">Interactive stats and visualization</div>
+                </div>
+              </div>
+            </button>
+            <button type="button" class="popover-item" id="toolCreateImageBtn">
+              <div class="popover-item-left">
+                <i data-lucide="image" style="width: 15px; height: 15px;"></i>
+                <div>
+                  <div class="item-title">Create Image</div>
+                  <div class="item-desc">Generate visuals with AI</div>
+                </div>
+              </div>
+            </button>
+            <button type="button" class="popover-item" id="toolCreateVideoBtn">
+              <div class="popover-item-left">
+                <i data-lucide="video" style="width: 15px; height: 15px;"></i>
+                <div>
+                  <div class="item-title">Generate AI Video</div>
+                  <div class="item-desc">Create cinematic motion shots</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Language Selector Popover -->
+        <div class="composer-popover hidden" id="languagePopover" role="menu" aria-label="Response Language">
+          <div class="popover-header">RESPONSE LANGUAGE</div>
+          <div class="popover-scroll-list" id="languagePopoverList">
+            <button type="button" class="popover-item active" data-lang="auto">
+              <div class="popover-item-left">
+                <div>
+                  <div class="item-title">Auto Detect (Default)</div>
+                  <div class="item-desc">Matches English, Sinhala Unicode, or Singlish</div>
+                </div>
+              </div>
+              <span class="check-icon">✓</span>
+            </button>
+            <button type="button" class="popover-item" data-lang="english">
+              <div class="popover-item-left">
+                <div>
+                  <div class="item-title">English</div>
+                  <div class="item-desc">Standard fluent English</div>
+                </div>
+              </div>
+              <span class="check-icon">✓</span>
+            </button>
+            <button type="button" class="popover-item" data-lang="sinhala">
+              <div class="popover-item-left">
+                <div>
+                  <div class="item-title">සිංහල (Sinhala)</div>
+                  <div class="item-desc">ස්වභාවික සිංහල භාෂාවෙන් පිළිතුරු</div>
+                </div>
+              </div>
+              <span class="check-icon">✓</span>
+            </button>
+            <button type="button" class="popover-item" data-lang="singlish">
+              <div class="popover-item-left">
+                <div>
+                  <div class="item-title">Singlish</div>
+                  <div class="item-desc">Romanized Sinhala (mata meka explain krnn)</div>
+                </div>
+              </div>
+              <span class="check-icon">✓</span>
+            </button>
+          </div>
+        </div>
+
         <div class="composer-box" id="composerBox">
           <!-- Attachment Preview Bar -->
           <div class="attachment-preview-bar hidden" id="attachmentPreviewBar"></div>
@@ -217,152 +375,6 @@
         <div class="composer-disclaimer">oska.AI may generate inaccurate information. Verify critical facts.</div>
       </div>
     </main>
-
-    <!-- Generic Popover Backdrop for Mobile / Outside-Click -->
-    <div class="popover-backdrop hidden" id="popoverBackdrop"></div>
-
-    <!-- Direct Model Picker Popover -->
-    <div class="composer-popover hidden" id="composerModelPopover" role="menu" aria-label="Select AI Model">
-      <div class="popover-header">AI MODELS</div>
-      <div class="popover-scroll-list" id="modelPopoverList">
-        <!-- Dynamically rendered -->
-      </div>
-    </div>
-
-    <!-- Direct Reasoning Effort Popover -->
-    <div class="composer-popover hidden" id="composerEffortPopover" role="menu" aria-label="Select Reasoning Effort">
-      <div class="popover-header">REASONING EFFORT</div>
-      <div class="popover-scroll-list" id="effortPopoverList">
-        <!-- Dynamically rendered -->
-      </div>
-    </div>
-
-    <!-- Tools Menu Popover -->
-    <div class="composer-popover hidden" id="toolsPopover" role="menu" aria-label="Workspace Tools">
-      <div class="popover-header">WORKSPACE TOOLS</div>
-      <div class="popover-scroll-list">
-        <button type="button" class="popover-item" id="toolWebSearchBtn">
-          <div class="popover-item-left">
-            <i data-lucide="globe" style="width: 15px; height: 15px;"></i>
-            <div>
-              <div class="item-title">Web Search</div>
-              <div class="item-desc">Live search with real source citations</div>
-            </div>
-          </div>
-        </button>
-        <button type="button" class="popover-item" id="toolResearchBtn">
-          <div class="popover-item-left">
-            <i data-lucide="book-open-check" style="width: 15px; height: 15px;"></i>
-            <div>
-              <div class="item-title">Deep Research</div>
-              <div class="item-desc">Multi-source structured investigation</div>
-            </div>
-          </div>
-        </button>
-        <button type="button" class="popover-item" id="toolDataAnalysisBtn">
-          <div class="popover-item-left">
-            <i data-lucide="line-chart" style="width: 15px; height: 15px;"></i>
-            <div>
-              <div class="item-title">Data & Chart Analysis</div>
-              <div class="item-desc">Interactive stats and visualization</div>
-            </div>
-          </div>
-        </button>
-        <button type="button" class="popover-item" id="toolCreateImageBtn">
-          <div class="popover-item-left">
-            <i data-lucide="image" style="width: 15px; height: 15px;"></i>
-            <div>
-              <div class="item-title">Create Image</div>
-              <div class="item-desc">Generate visuals with AI</div>
-            </div>
-          </div>
-        </button>
-        <button type="button" class="popover-item" id="toolCreateVideoBtn">
-          <div class="popover-item-left">
-            <i data-lucide="video" style="width: 15px; height: 15px;"></i>
-            <div>
-              <div class="item-title">Generate AI Video</div>
-              <div class="item-desc">Create cinematic motion shots</div>
-            </div>
-          </div>
-        </button>
-      </div>
-    </div>
-
-    <!-- Language Selector Popover -->
-    <div class="composer-popover hidden" id="languagePopover" role="menu" aria-label="Response Language">
-      <div class="popover-header">RESPONSE LANGUAGE</div>
-      <div class="popover-scroll-list" id="languagePopoverList">
-        <button type="button" class="popover-item active" data-lang="auto">
-          <div class="popover-item-left">
-            <div>
-              <div class="item-title">Auto Detect (Default)</div>
-              <div class="item-desc">Matches English, Sinhala Unicode, or Singlish</div>
-            </div>
-          </div>
-          <span class="check-icon">✓</span>
-        </button>
-        <button type="button" class="popover-item" data-lang="english">
-          <div class="popover-item-left">
-            <div>
-              <div class="item-title">English</div>
-              <div class="item-desc">Standard fluent English</div>
-            </div>
-          </div>
-          <span class="check-icon">✓</span>
-        </button>
-        <button type="button" class="popover-item" data-lang="sinhala">
-          <div class="popover-item-left">
-            <div>
-              <div class="item-title">සිංහල (Sinhala)</div>
-              <div class="item-desc">ස්වභාවික සිංහල භාෂාවෙන් පිළිතුරු</div>
-            </div>
-          </div>
-          <span class="check-icon">✓</span>
-        </button>
-        <button type="button" class="popover-item" data-lang="singlish">
-          <div class="popover-item-left">
-            <div>
-              <div class="item-title">Singlish</div>
-              <div class="item-desc">Romanized Sinhala (mata meka explain krnn)</div>
-            </div>
-          </div>
-          <span class="check-icon">✓</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Account & User Popover -->
-    <div class="composer-popover hidden" id="accountPopover" role="menu" aria-label="Account Menu">
-      <div class="popover-header">MY ACCOUNT</div>
-      <div class="popover-scroll-list">
-        <div class="account-profile-header">
-          <div class="avatar-large" id="menuUserAvatar">U</div>
-          <div>
-            <div class="menu-user-name" id="menuUserName">Guest User</div>
-            <div class="menu-user-email" id="menuUserEmail">guest@oska.ai</div>
-          </div>
-        </div>
-        <button type="button" class="popover-item" id="menuAdminBtn" style="display: none;">
-          <div class="popover-item-left">
-            <i data-lucide="shield-check" style="width: 15px; height: 15px; color: var(--accent-primary);"></i>
-            <span>Admin Console</span>
-          </div>
-        </button>
-        <button type="button" class="popover-item" id="menuLoginBtn">
-          <div class="popover-item-left">
-            <i data-lucide="log-in" style="width: 15px; height: 15px;"></i>
-            <span>Sign in with Google</span>
-          </div>
-        </button>
-        <button type="button" class="popover-item hidden" id="menuSignOutBtn">
-          <div class="popover-item-left">
-            <i data-lucide="log-out" style="width: 15px; height: 15px; color: #ef4444;"></i>
-            <span style="color: #ef4444;">Sign Out</span>
-          </div>
-        </button>
-      </div>
-    </div>
 
     <!-- Google Sign-In / Login Modal -->
     <div class="modal-overlay hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">

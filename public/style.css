@@ -715,10 +715,9 @@ button, input, textarea, select {
 .popover-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(1.5px);
+  background-color: transparent;
+  backdrop-filter: none;
   z-index: 140;
-  transition: opacity var(--transition-fast);
 }
 
 .composer-popover {
@@ -740,6 +739,49 @@ button, input, textarea, select {
 }
 
 .composer-popover.hidden {
+  display: none;
+}
+
+#toolsPopover {
+  left: 1.25rem;
+  right: auto;
+}
+
+#languagePopover {
+  left: 5.5rem;
+  right: auto;
+  width: 260px;
+}
+
+#composerModelPopover {
+  right: 6.5rem;
+}
+
+#composerEffortPopover {
+  right: 1.25rem;
+  width: 240px;
+}
+
+/* Sidebar Account Dropdown Popover */
+.account-popover {
+  position: fixed;
+  bottom: 74px;
+  left: 12px;
+  width: 245px;
+  max-width: calc(100vw - 24px);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  z-index: 155;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem;
+  animation: slideUp 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.account-popover.hidden {
   display: none;
 }
 

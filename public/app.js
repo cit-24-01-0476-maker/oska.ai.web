@@ -594,6 +594,26 @@ function setupUIEventListeners() {
     });
   }
 
+  const menuSettingsBtn = document.getElementById('menuSettingsBtn');
+  if (menuSettingsBtn) {
+    menuSettingsBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      document.getElementById('settingsModal').classList.remove('hidden');
+    });
+  }
+
+  const menuThemeBtn = document.getElementById('menuThemeBtn');
+  if (menuThemeBtn) {
+    menuThemeBtn.addEventListener('click', () => {
+      state.theme = state.theme === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', state.theme);
+      localStorage.setItem('oska_theme', state.theme);
+      updateThemeIcon();
+      hideAllPopovers();
+      showToast(`Switched to ${state.theme === 'light' ? 'Light' : 'Dark'} theme`);
+    });
+  }
+
   // Workspace Tools buttons
   setupWorkspaceToolsButtons();
 
@@ -635,7 +655,7 @@ function togglePopover(popoverId) {
 }
 
 function hideAllPopovers() {
-  document.querySelectorAll('.composer-popover').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.composer-popover, .account-popover').forEach(p => p.classList.add('hidden'));
   const backdrop = document.getElementById('popoverBackdrop');
   if (backdrop) backdrop.classList.add('hidden');
 }
