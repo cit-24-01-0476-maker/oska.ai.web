@@ -1,7 +1,7 @@
 /**
- * oska.AI V1 — Complete Production AI Platform Client
- * ChatGPT-Grade Multi-Model Workspace with Firebase Auth,
- * Universal Document/Data Analysis, Real Web Search, & Multilingual Intelligence
+ * oska.AI V1 — Production AI Platform Client
+ * Google-Only Authentication, Clean Auth Gate, Document Intelligence,
+ * Multilingual Engine, and Multi-Provider AI Routing.
  */
 
 // -------------------------------------------------------------
@@ -17,7 +17,6 @@ const firebaseConfig = {
 };
 
 let auth = null;
-let currentUser = null;
 
 if (typeof firebase !== 'undefined' && firebase.initializeApp) {
   try {
@@ -116,22 +115,51 @@ let state = {
   theme: localStorage.getItem('oska_theme') || 'light',
   isGenerating: false,
   attachments: [],
-  activeTool: null, // 'web-search' | 'research' | 'data-analysis'
+  activeTool: null,
   abortController: null,
   activeSpeechRecognition: null
 };
 
 // -------------------------------------------------------------
-// 4. Multilingual & Singlish Intelligence Engine
+// 4. Centralized Authentication Gate (`requireAuth`)
+// -------------------------------------------------------------
+function requireAuth(actionCallback) {
+  if (!state.user) {
+    openAuthModal();
+    return false;
+  }
+  if (typeof actionCallback === 'function') {
+    actionCallback();
+  }
+  return true;
+}
+
+function openAuthModal() {
+  hideAllPopovers();
+  const modal = document.getElementById('loginModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    const googleBtn = document.getElementById('googleSignInBtn');
+    if (googleBtn) googleBtn.focus();
+  }
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById('loginModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+// -------------------------------------------------------------
+// 5. Multilingual & Singlish Intelligence Engine
 // -------------------------------------------------------------
 function detectLanguageIntent(text) {
   if (!text) return 'english';
 
-  // 1. Check for Sinhala Unicode characters
+  // Check for Sinhala Unicode characters
   const hasSinhalaUnicode = /[\u0D80-\u0DFF]/.test(text);
   if (hasSinhalaUnicode) return 'sinhala';
 
-  // 2. Check for Singlish keywords
+  // Check for Singlish keywords
   const singlishPattern = /\b(mata|oya|mokakda|kohomada|karanna|krnn|hadanna|ekak|thiyenawa|kiyanna|puluwanda|ane|meka|monawada|kohomath|dan|onna|ehema|thama|kiyala|hithanna|danna|wadak|nadda|mokada|kawda|koheda)\b/i;
   if (singlishPattern.test(text)) return 'singlish';
 
@@ -154,7 +182,7 @@ function buildLanguageSystemPrompt(userText, selectedLang) {
 }
 
 // -------------------------------------------------------------
-// 5. Universal Document & File Parsers
+// 6. Universal Document & File Parsers
 // -------------------------------------------------------------
 async function parseUploadedFile(file) {
   const fileName = file.name;
@@ -235,7 +263,6 @@ async function parseUploadedFile(file) {
           const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
           if (jsonData.length > 0) {
             summaryText += `\nSheet: "${sheetName}" (${jsonData.length} rows, ${jsonData[0] ? jsonData[0].length : 0} cols)\n`;
-            // Table preview
             const previewRows = jsonData.slice(0, 25);
             summaryText += previewRows.map(row => (Array.isArray(row) ? row.join(' | ') : '')).join('\n') + '\n';
             if (!chartableData && jsonData.length > 1) {
@@ -272,16 +299,20 @@ async function parseUploadedFile(file) {
 }
 
 // -------------------------------------------------------------
-// 6. Persistence & Storage Helpers (Isolated per User)
+// 7. Persistence & Storage Helpers (Isolated Per Google User)
 // -------------------------------------------------------------
 function getStorageKey() {
-  const uid = state.user ? state.user.uid : 'guest';
-  return `oska_conversations_${uid}`;
+  if (!state.user) return null;
+  return `oska_conversations_${state.user.uid}`;
 }
 
 function loadSavedConversations() {
+  const key = getStorageKey();
+  if (!key) {
+    state.conversations = [];
+    return;
+  }
   try {
-    const key = getStorageKey();
     const saved = localStorage.getItem(key);
     state.conversations = saved ? JSON.parse(saved) : [];
   } catch (e) {
@@ -290,8 +321,9 @@ function loadSavedConversations() {
 }
 
 function saveConversationsToStorage() {
+  const key = getStorageKey();
+  if (!key) return;
   try {
-    const key = getStorageKey();
     localStorage.setItem(key, JSON.stringify(state.conversations));
   } catch (e) {
     console.warn('Storage save notice:', e);
@@ -299,14 +331,12 @@ function saveConversationsToStorage() {
 }
 
 // -------------------------------------------------------------
-// 7. Initialization & DOM Setup
+// 8. Initialization & DOM Setup
 // -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-  // Apply saved theme
   document.documentElement.setAttribute('data-theme', state.theme);
   updateThemeIcon();
 
-  // Initialize UI
   setupAuthListeners();
   setupUIEventListeners();
   setupSpeechRecognition();
@@ -314,19 +344,17 @@ document.addEventListener('DOMContentLoaded', () => {
   renderEffortPopoverList();
   renderConversationsList();
 
-  // Highlight.js
   if (typeof hljs !== 'undefined') {
     hljs.configure({ ignoreUnescapedHTML: true });
   }
 
-  // Lucide icons
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }
 });
 
 // -------------------------------------------------------------
-// 8. Authentication Management
+// 9. Authentication Management (Google-Only)
 // -------------------------------------------------------------
 function setupAuthListeners() {
   if (auth) {
@@ -336,7 +364,7 @@ function setupAuthListeners() {
       loadSavedConversations();
       renderConversationsList();
 
-      // Check admin status
+      // Check admin privileges
       const adminEmails = ['oshadhaperer@gmail.com', 'cit24010476@gmail.com'];
       const menuAdminBtn = document.getElementById('menuAdminBtn');
       if (menuAdminBtn) {
@@ -345,43 +373,55 @@ function setupAuthListeners() {
     });
   }
 
-  // Google Sign-In Button
+  // Google Sign-In Button inside Modal
   const googleSignInBtn = document.getElementById('googleSignInBtn');
+  const googleSignInBtnText = document.getElementById('googleSignInBtnText');
+  const closeLoginModalBtn = document.getElementById('closeLoginModalBtn');
+  const loginDismissBtn = document.getElementById('loginDismissBtn');
+
   if (googleSignInBtn) {
     googleSignInBtn.addEventListener('click', async () => {
       if (!auth) {
-        showToast('Firebase Auth is ready in client mode');
+        showToast('Authentication ready in direct mode');
         return;
       }
       try {
+        googleSignInBtn.disabled = true;
+        if (googleSignInBtnText) googleSignInBtnText.textContent = 'Connecting to Google...';
+
         const provider = new firebase.auth.GoogleAuthProvider();
         await auth.signInWithPopup(provider);
-        hideAllPopovers();
-        document.getElementById('loginModal').classList.add('hidden');
-        showToast('Successfully signed in with Google!');
+
+        closeAuthModal();
+        showToast('Signed in successfully with Google!');
       } catch (err) {
-        console.error('Sign-in error:', err);
-        showToast('Google Sign-In notice: ' + (err.message || 'Check popup settings'));
+        if (err.code !== 'auth/popup-closed-by-user') {
+          console.error('Google Sign-In notice:', err);
+          showToast('Sign-In notice: ' + (err.message || 'Check popup permissions'));
+        }
+      } finally {
+        googleSignInBtn.disabled = false;
+        if (googleSignInBtnText) googleSignInBtnText.textContent = 'Continue with Google';
       }
     });
   }
 
-  // Guest Continue Button
-  const guestContinueBtn = document.getElementById('guestContinueBtn');
-  if (guestContinueBtn) {
-    guestContinueBtn.addEventListener('click', () => {
-      document.getElementById('loginModal').classList.add('hidden');
-    });
-  }
+  if (closeLoginModalBtn) closeLoginModalBtn.addEventListener('click', closeAuthModal);
+  if (loginDismissBtn) loginDismissBtn.addEventListener('click', closeAuthModal);
 
-  // Sign out
+  // Sign out handler
   const menuSignOutBtn = document.getElementById('menuSignOutBtn');
   if (menuSignOutBtn) {
     menuSignOutBtn.addEventListener('click', async () => {
       if (auth) {
         await auth.signOut();
-        showToast('Signed out');
+        state.user = null;
+        state.conversations = [];
+        updateUserProfileUI(null);
+        renderConversationsList();
+        createNewConversation();
         hideAllPopovers();
+        showToast('Signed out of oska.AI');
       }
     });
   }
@@ -398,34 +438,36 @@ function updateUserProfileUI(user) {
   const menuSignOutBtn = document.getElementById('menuSignOutBtn');
 
   if (user) {
-    const initials = (user.displayName || user.email || 'U').charAt(0).toUpperCase();
+    const initial = (user.displayName || user.email || 'U').charAt(0).toUpperCase();
     if (user.photoURL) {
-      userAvatar.innerHTML = `<img src="${user.photoURL}" alt="${user.displayName}">`;
-      menuUserAvatar.innerHTML = `<img src="${user.photoURL}" alt="${user.displayName}">`;
+      userAvatar.innerHTML = `<img src="${user.photoURL}" alt="${user.displayName || 'User'}">`;
+      menuUserAvatar.innerHTML = `<img src="${user.photoURL}" alt="${user.displayName || 'User'}">`;
     } else {
-      userAvatar.textContent = initials;
-      menuUserAvatar.textContent = initials;
+      userAvatar.textContent = initial;
+      menuUserAvatar.textContent = initial;
     }
-    userDisplayName.textContent = user.displayName || 'Google User';
+    userDisplayName.textContent = user.displayName || 'Google Account';
     userEmailText.textContent = user.email || 'Connected';
-    menuUserName.textContent = user.displayName || 'Google User';
+    menuUserName.textContent = user.displayName || 'Google Account';
     menuUserEmail.textContent = user.email || '';
     if (menuLoginBtn) menuLoginBtn.classList.add('hidden');
     if (menuSignOutBtn) menuSignOutBtn.classList.remove('hidden');
   } else {
-    userAvatar.textContent = 'G';
-    menuUserAvatar.textContent = 'G';
-    userDisplayName.textContent = 'Guest User';
-    userEmailText.textContent = 'Sign in to save cloud sync';
-    menuUserName.textContent = 'Guest User';
-    menuUserEmail.textContent = 'guest@oska.ai';
+    userAvatar.innerHTML = `<i data-lucide="user" style="width: 14px; height: 14px;"></i>`;
+    menuUserAvatar.innerHTML = `<i data-lucide="user" style="width: 18px; height: 18px;"></i>`;
+    userDisplayName.textContent = 'Sign in';
+    userEmailText.textContent = 'Use oska.AI with Google';
+    menuUserName.textContent = 'oska.AI Account';
+    menuUserEmail.textContent = 'Sign in with Google';
     if (menuLoginBtn) menuLoginBtn.classList.remove('hidden');
     if (menuSignOutBtn) menuSignOutBtn.classList.add('hidden');
   }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // -------------------------------------------------------------
-// 9. UI Events & Interactive Control Bindings
+// 10. UI Events & Interactive Control Bindings
 // -------------------------------------------------------------
 function setupUIEventListeners() {
   const chatInput = document.getElementById('chatInput');
@@ -450,6 +492,8 @@ function setupUIEventListeners() {
   const saveSettingsBtn = document.getElementById('saveSettingsBtn');
   const clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
   const menuLoginBtn = document.getElementById('menuLoginBtn');
+  const menuSettingsBtn = document.getElementById('menuSettingsBtn');
+  const menuThemeBtn = document.getElementById('menuThemeBtn');
   const menuAdminBtn = document.getElementById('menuAdminBtn');
   const closeAdminBtn = document.getElementById('closeAdminBtn');
 
@@ -470,8 +514,14 @@ function setupUIEventListeners() {
     }
   });
 
-  // Global Shortcut Ctrl + K for New Chat
+  // Global Shortcuts: Escape to close modals, Ctrl+K for new chat
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeAuthModal();
+      document.getElementById('settingsModal').classList.add('hidden');
+      document.getElementById('adminModal').classList.add('hidden');
+      hideAllPopovers();
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       createNewConversation();
@@ -481,13 +531,33 @@ function setupUIEventListeners() {
   sendBtn.addEventListener('click', handleSendMessage);
   stopBtn.addEventListener('click', handleStopGeneration);
 
-  newChatBtn.addEventListener('click', createNewConversation);
-  if (headerNewChatBtn) headerNewChatBtn.addEventListener('click', createNewConversation);
-  brandHomeBtn.addEventListener('click', (e) => { e.preventDefault(); createNewConversation(); });
+  newChatBtn.addEventListener('click', () => {
+    if (!state.user && state.conversations.length > 0) {
+      openAuthModal();
+    } else {
+      createNewConversation();
+    }
+  });
 
-  // File Attachments
-  attachBtn.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', handleFileUpload);
+  if (headerNewChatBtn) {
+    headerNewChatBtn.addEventListener('click', () => {
+      createNewConversation();
+    });
+  }
+
+  brandHomeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    createNewConversation();
+  });
+
+  // Protected File Attachment
+  attachBtn.addEventListener('click', () => {
+    requireAuth(() => fileInput.click());
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    requireAuth(() => handleFileUpload(e));
+  });
 
   // Tools Popover
   toolsMenuBtn.addEventListener('click', (e) => {
@@ -525,9 +595,14 @@ function setupUIEventListeners() {
     togglePopover('composerEffortPopover');
   });
 
+  // Profile Button: If unauthenticated, directly open Google login modal; if logged in, open account dropdown
   userProfileBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    togglePopover('accountPopover');
+    if (!state.user) {
+      openAuthModal();
+    } else {
+      togglePopover('accountPopover');
+    }
   });
 
   popoverBackdrop.addEventListener('click', hideAllPopovers);
@@ -564,6 +639,25 @@ function setupUIEventListeners() {
   closeSettingsBtn.addEventListener('click', () => document.getElementById('settingsModal').classList.add('hidden'));
   saveSettingsBtn.addEventListener('click', () => document.getElementById('settingsModal').classList.add('hidden'));
 
+  // Menu Settings & Theme buttons
+  if (menuSettingsBtn) {
+    menuSettingsBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      document.getElementById('settingsModal').classList.remove('hidden');
+    });
+  }
+
+  if (menuThemeBtn) {
+    menuThemeBtn.addEventListener('click', () => {
+      state.theme = state.theme === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', state.theme);
+      localStorage.setItem('oska_theme', state.theme);
+      updateThemeIcon();
+      hideAllPopovers();
+      showToast(`Switched to ${state.theme === 'light' ? 'Light' : 'Dark'} theme`);
+    });
+  }
+
   // Admin Console Modal
   if (menuAdminBtn) {
     menuAdminBtn.addEventListener('click', () => {
@@ -590,31 +684,11 @@ function setupUIEventListeners() {
   if (menuLoginBtn) {
     menuLoginBtn.addEventListener('click', () => {
       hideAllPopovers();
-      document.getElementById('loginModal').classList.remove('hidden');
+      openAuthModal();
     });
   }
 
-  const menuSettingsBtn = document.getElementById('menuSettingsBtn');
-  if (menuSettingsBtn) {
-    menuSettingsBtn.addEventListener('click', () => {
-      hideAllPopovers();
-      document.getElementById('settingsModal').classList.remove('hidden');
-    });
-  }
-
-  const menuThemeBtn = document.getElementById('menuThemeBtn');
-  if (menuThemeBtn) {
-    menuThemeBtn.addEventListener('click', () => {
-      state.theme = state.theme === 'light' ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', state.theme);
-      localStorage.setItem('oska_theme', state.theme);
-      updateThemeIcon();
-      hideAllPopovers();
-      showToast(`Switched to ${state.theme === 'light' ? 'Light' : 'Dark'} theme`);
-    });
-  }
-
-  // Workspace Tools buttons
+  // Protected Workspace Tools buttons
   setupWorkspaceToolsButtons();
 
   // Welcome prompt shortcut chips
@@ -639,7 +713,7 @@ function updateThemeIcon() {
 }
 
 // -------------------------------------------------------------
-// 10. Popover Management
+// 11. Popover Management
 // -------------------------------------------------------------
 function togglePopover(popoverId) {
   const popover = document.getElementById(popoverId);
@@ -661,7 +735,7 @@ function hideAllPopovers() {
 }
 
 // -------------------------------------------------------------
-// 11. Model & Reasoning Popover Renderers
+// 12. Model & Reasoning Popover Renderers
 // -------------------------------------------------------------
 function renderModelPopoverList() {
   const container = document.getElementById('modelPopoverList');
@@ -730,7 +804,7 @@ function selectEffort(effortKey) {
 }
 
 // -------------------------------------------------------------
-// 12. Workspace Tools & Media Generators
+// 13. Workspace Tools & Media Generators (Auth-Protected)
 // -------------------------------------------------------------
 function setupWorkspaceToolsButtons() {
   const toolWebSearchBtn = document.getElementById('toolWebSearchBtn');
@@ -742,6 +816,7 @@ function setupWorkspaceToolsButtons() {
   if (toolWebSearchBtn) {
     toolWebSearchBtn.addEventListener('click', () => {
       hideAllPopovers();
+      if (!requireAuth()) return;
       const input = document.getElementById('chatInput');
       input.value = `/search ${input.value}`.trim() + ' ';
       input.focus();
@@ -752,6 +827,7 @@ function setupWorkspaceToolsButtons() {
   if (toolResearchBtn) {
     toolResearchBtn.addEventListener('click', () => {
       hideAllPopovers();
+      if (!requireAuth()) return;
       const input = document.getElementById('chatInput');
       input.value = `/research ${input.value}`.trim() + ' ';
       input.focus();
@@ -762,6 +838,7 @@ function setupWorkspaceToolsButtons() {
   if (toolDataAnalysisBtn) {
     toolDataAnalysisBtn.addEventListener('click', () => {
       hideAllPopovers();
+      if (!requireAuth()) return;
       document.getElementById('fileInput').click();
       showToast('Attach an Excel, CSV, or document for Data Analysis');
     });
@@ -770,6 +847,7 @@ function setupWorkspaceToolsButtons() {
   if (toolCreateImageBtn) {
     toolCreateImageBtn.addEventListener('click', () => {
       hideAllPopovers();
+      if (!requireAuth()) return;
       const input = document.getElementById('chatInput');
       input.value = `/image a serene minimalist architectural studio in Kyoto during sunset, 8k cinematic lighting`;
       input.focus();
@@ -781,6 +859,7 @@ function setupWorkspaceToolsButtons() {
   if (toolCreateVideoBtn) {
     toolCreateVideoBtn.addEventListener('click', () => {
       hideAllPopovers();
+      if (!requireAuth()) return;
       const input = document.getElementById('chatInput');
       input.value = `/video smooth drone flyover of mist-covered pine mountains at dawn`;
       input.focus();
@@ -791,7 +870,7 @@ function setupWorkspaceToolsButtons() {
 }
 
 // -------------------------------------------------------------
-// 13. File Upload Handler & Attachment Bar
+// 14. File Upload Handler & Attachment Bar
 // -------------------------------------------------------------
 async function handleFileUpload(e) {
   const files = Array.from(e.target.files);
@@ -839,7 +918,7 @@ window.removeAttachment = function(idx) {
 };
 
 // -------------------------------------------------------------
-// 14. Voice Recognition (Speech to Text)
+// 15. Voice Recognition (Speech to Text)
 // -------------------------------------------------------------
 function setupSpeechRecognition() {
   const micBtn = document.getElementById('voiceMicBtn');
@@ -883,6 +962,7 @@ function setupSpeechRecognition() {
   };
 
   micBtn.addEventListener('click', () => {
+    if (!requireAuth()) return;
     if (micBtn.classList.contains('listening')) {
       recognition.stop();
     } else {
@@ -896,7 +976,7 @@ function setupSpeechRecognition() {
 }
 
 // -------------------------------------------------------------
-// 15. Conversation Management & Rendering
+// 16. Conversation Management & Rendering
 // -------------------------------------------------------------
 function createNewConversation() {
   state.activeConversationId = null;
@@ -922,6 +1002,18 @@ function createNewConversation() {
 function renderConversationsList() {
   const listContainer = document.getElementById('sidebarHistory');
   if (!listContainer) return;
+
+  if (!state.user) {
+    listContainer.innerHTML = `
+      <div class="sidebar-auth-hint" onclick="openAuthModal()">
+        <i data-lucide="lock" style="width: 16px; height: 16px; margin-bottom: 2px;"></i>
+        <span style="font-weight: 500;">Sign in to view your chats</span>
+        <span style="font-size: 0.72rem; color: var(--text-muted);">Sync across all your devices</span>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
 
   if (!state.conversations.length) {
     listContainer.innerHTML = `<div style="padding: 1.5rem 0.5rem; text-align: center; color: var(--text-muted); font-size: 0.8rem;">No conversations yet</div>`;
@@ -983,7 +1075,7 @@ window.deleteConversation = function(convId) {
 };
 
 // -------------------------------------------------------------
-// 16. Chat Streaming & Execution Flow
+// 17. Chat Streaming & Execution Flow (Auth Gate Protected)
 // -------------------------------------------------------------
 async function handleSendMessage() {
   const input = document.getElementById('chatInput');
@@ -993,7 +1085,12 @@ async function handleSendMessage() {
   if (!prompt && !currentAttachments.length) return;
   if (state.isGenerating) return;
 
-  // Clear composer
+  // 1. Strict Auth Gate: If unauthenticated, open login modal and PRESERVE the prompt in chatInput!
+  if (!requireAuth()) {
+    return;
+  }
+
+  // Clear composer only after auth passes
   input.value = '';
   input.style.height = 'auto';
   state.attachments = [];
@@ -1045,10 +1142,9 @@ async function handleSendMessage() {
   const assistantRow = appendMessageToDOM('assistant', '', '', null, null, null, assistantBubbleId);
   const bubbleContent = assistantRow.querySelector('.message-bubble');
 
-  // Toggle generating state
   setGeneratingState(true);
 
-  // 1. Handle Slash Commands (/image, /video)
+  // Handle Slash Commands (/image, /video)
   if (prompt.startsWith('/image ')) {
     await handleImageGeneration(prompt.replace('/image ', ''), bubbleContent, conv);
     setGeneratingState(false);
@@ -1061,10 +1157,10 @@ async function handleSendMessage() {
     return;
   }
 
-  // 2. Multilingual System Prompt Preparation
+  // Multilingual System Prompt Preparation
   const systemPrompt = buildLanguageSystemPrompt(prompt, state.responseLanguage);
 
-  // 3. API Streaming Request
+  // API Streaming Request
   state.abortController = new AbortController();
 
   try {
@@ -1073,13 +1169,15 @@ async function handleSendMessage() {
       ...conv.messages.slice(-8).map(m => ({ role: m.role, content: m.content }))
     ];
 
-    // Check for inline images
     const imageAttachment = currentAttachments.find(a => a.type === 'image');
     let inlineImage = imageAttachment ? { mimeType: imageAttachment.mimeType, base64: imageAttachment.base64 } : null;
 
     const response = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.user ? state.user.uid : ''}`
+      },
       body: JSON.stringify({
         messages: messagesPayload,
         model: state.selectedModel,
@@ -1120,7 +1218,6 @@ async function handleSendMessage() {
               updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
             }
           } catch (e) {
-            // raw text fallback
             assistantText += raw;
             updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
           }
@@ -1129,7 +1226,7 @@ async function handleSendMessage() {
       scrollChatToBottom();
     }
 
-    // Interactive Chart Generation for Spreadsheets
+    // Chart Generation for Spreadsheets
     let generatedChart = null;
     if (hasSpreadsheet && chartData && (prompt.toLowerCase().includes('chart') || prompt.toLowerCase().includes('graph') || prompt.toLowerCase().includes('visualize') || prompt.toLowerCase().includes('revenue'))) {
       generatedChart = renderSpreadsheetChart(bubbleContent, chartData);
@@ -1181,14 +1278,17 @@ function setGeneratingState(isGenerating) {
 }
 
 // -------------------------------------------------------------
-// 17. Image & Video Generation Handlers
+// 18. Image & Video Generation Handlers
 // -------------------------------------------------------------
 async function handleImageGeneration(prompt, bubbleElement, conv) {
   bubbleElement.innerHTML = `<p>🎨 <em>Creating high-resolution visual for: "${escapeHtml(prompt)}"...</em></p>`;
   try {
     const res = await fetch('/api/images/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.user ? state.user.uid : ''}`
+      },
       body: JSON.stringify({ prompt })
     });
     const data = await res.json();
@@ -1219,7 +1319,10 @@ async function handleVideoGeneration(prompt, bubbleElement, conv) {
   try {
     const res = await fetch('/api/videos/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.user ? state.user.uid : ''}`
+      },
       body: JSON.stringify({ prompt })
     });
     const data = await res.json();
@@ -1246,7 +1349,7 @@ async function handleVideoGeneration(prompt, bubbleElement, conv) {
 }
 
 // -------------------------------------------------------------
-// 18. DOM Rendering & Chart Creation
+// 19. DOM Rendering & Chart Creation
 // -------------------------------------------------------------
 function appendMessageToDOM(role, content, reasoning, media, citations, chart, rowId) {
   const container = document.getElementById('conversationContainer');
@@ -1256,7 +1359,6 @@ function appendMessageToDOM(role, content, reasoning, media, citations, chart, r
 
   let renderedHTML = '';
 
-  // 1. Reasoning Accordion
   if (reasoning) {
     renderedHTML += `
       <div class="reasoning-box">
@@ -1269,10 +1371,8 @@ function appendMessageToDOM(role, content, reasoning, media, citations, chart, r
     `;
   }
 
-  // 2. Main Content Markdown
   renderedHTML += renderMarkdown(content);
 
-  // 3. Media Card
   if (media && media.url) {
     renderedHTML += `
       <div class="ai-media-card">
@@ -1331,7 +1431,6 @@ function renderSpreadsheetChart(bubbleElement, chartData) {
     `;
     bubbleElement.appendChild(chartCard);
 
-    // Extract first 10 rows for chart
     const labels = chartData.rows.slice(0, 8).map(r => String(r[0] || ''));
     const values = chartData.rows.slice(0, 8).map(r => Number(r[1]) || 0);
 
@@ -1368,7 +1467,7 @@ function renderSpreadsheetChart(bubbleElement, chartData) {
 }
 
 // -------------------------------------------------------------
-// 19. Markdown & Code Block Formatter
+// 20. Markdown & Code Block Formatter
 // -------------------------------------------------------------
 function renderMarkdown(content) {
   if (!content) return '';
@@ -1402,7 +1501,7 @@ function escapeHtml(str) {
 }
 
 // -------------------------------------------------------------
-// 20. Toast Notifications
+// 21. Toast Notifications
 // -------------------------------------------------------------
 function showToast(message) {
   const container = document.getElementById('toastContainer');
