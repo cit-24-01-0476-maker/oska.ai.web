@@ -529,7 +529,7 @@ module.exports = async (req, res) => {
   // -------------------------------------------------------------
   // Dedicated Admin Command Center Routing & Security
   // -------------------------------------------------------------
-  if (pathname.startsWith('/api/admin') || pathname === '/api/presence/heartbeat') {
+  if (pathname.startsWith('/api/admin') || pathname.startsWith('/api/presence') || pathname === '/api/system/status') {
     const handled = await adminService.handleAdminRequest(pathname, req, res, getRequestBody);
     if (handled) return;
   }

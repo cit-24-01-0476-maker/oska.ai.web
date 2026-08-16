@@ -314,8 +314,8 @@ function enterCommandCenter(adminInfo) {
   // Load live data
   refreshAdminData();
 
-  // Start periodic polling for live presence & health (every 10s)
-  setInterval(pollLivePresence, 10000);
+  // Start periodic polling for live presence & health (every 4s for true real-time visibility)
+  setInterval(pollLivePresence, 4000);
 }
 
 // -------------------------------------------------------------
@@ -538,7 +538,16 @@ async function loadLivePresenceData() {
   if (!res.ok) return;
   const data = await res.json();
 
-  document.getElementById('liveActiveCountLabel').textContent = `${data.onlineCount} Active Session${data.onlineCount > 1 ? 's' : ''}`;
+  const count = data.onlineCount || 1;
+  const label = document.getElementById('liveActiveCountLabel');
+  if (label) label.textContent = `${count} Active Session${count > 1 ? 's' : ''}`;
+
+  const kpiOnline = document.getElementById('kpiOnlineNow');
+  if (kpiOnline) kpiOnline.textContent = count;
+
+  const navCount = document.getElementById('navLiveCount');
+  if (navCount) navCount.textContent = count;
+
   const tbody = document.getElementById('livePresenceTableBody');
 
   if (data.users && data.users.length > 0) {
@@ -548,7 +557,7 @@ async function loadLivePresenceData() {
         <td>${escapeHtml(u.email || 'user@oska.ai')}</td>
         <td>${escapeHtml(Object.values(u.connections || {})[0]?.device || 'Desktop')}</td>
         <td><span class="cap-tag">${escapeHtml(Object.values(u.connections || {})[0]?.area || 'Chat')}</span></td>
-        <td><span class="status-badge active">${escapeHtml(u.activity || 'Idle')}</span></td>
+        <td><span class="status-badge ${u.online ? 'active' : 'warn'}">${escapeHtml(u.activity || (u.online ? 'Active' : 'Offline'))}</span></td>
         <td>${Object.keys(u.connections || {}).length || 1} connection(s)</td>
         <td class="code-cell">${formatTime(u.lastSeen)}</td>
       </tr>

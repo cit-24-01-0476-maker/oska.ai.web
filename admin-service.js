@@ -385,22 +385,26 @@ function updatePresence(uid, connectionId, details = {}) {
   if (!userPres) {
     userPres = {
       uid: uid,
-      email: details.email || 'user',
+      email: details.email || 'user@oska.ai',
       displayName: details.displayName || (details.email || 'User').split('@')[0],
       photoURL: details.photoURL || '',
       connections: {},
       online: true,
       lastSeen: new Date(now).toISOString(),
-      activity: details.activity || 'Idle'
+      activity: details.activity || 'Browsing'
     };
     presenceLedger.set(uid, userPres);
+  } else {
+    if (details.email && details.email !== 'user') userPres.email = details.email;
+    if (details.displayName && details.displayName !== 'User') userPres.displayName = details.displayName;
+    if (details.photoURL) userPres.photoURL = details.photoURL;
   }
 
   const connKey = connectionId || 'default_conn';
   userPres.connections[connKey] = {
     device: details.device || 'Desktop',
     area: details.area || 'Chat',
-    activity: details.activity || 'Idle',
+    activity: details.activity || 'Browsing',
     lastSeen: now
   };
 
@@ -408,15 +412,55 @@ function updatePresence(uid, connectionId, details = {}) {
   userPres.activity = details.activity || userPres.activity;
   userPres.online = true;
 
-  // Clean stale connections (> 2 mins)
+  // Clean stale connections (> 35 seconds)
   for (const [cId, conn] of Object.entries(userPres.connections)) {
-    if (now - conn.lastSeen > 120000) {
+    if (now - conn.lastSeen > 35000) {
       delete userPres.connections[cId];
     }
   }
 
   if (Object.keys(userPres.connections).length === 0) {
     userPres.online = false;
+  }
+
+  // Also ensure user directory has this user
+  if (details.email && !details.email.startsWith('Guest Visitor')) {
+    let dirUser = userDirectory.get(uid);
+    if (!dirUser) {
+      dirUser = {
+        uid: uid,
+        email: details.email,
+        displayName: details.displayName || details.email.split('@')[0],
+        photoURL: details.photoURL || '',
+        role: isAllowedAdminEmail(details.email) ? 'ADMIN' : 'USER',
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+        lastSignIn: new Date().toISOString(),
+        lastSeen: new Date().toISOString(),
+        totalChats: 1,
+        totalTokens: 0,
+        totalRequests: 0
+      };
+      userDirectory.set(uid, dirUser);
+    } else {
+      dirUser.lastSeen = new Date().toISOString();
+    }
+  }
+}
+
+function removePresenceConnection(uid, connectionId) {
+  if (!uid) return;
+  const userPres = presenceLedger.get(uid);
+  if (userPres) {
+    if (connectionId && userPres.connections[connectionId]) {
+      delete userPres.connections[connectionId];
+    } else if (!connectionId) {
+      userPres.connections = {};
+    }
+    if (Object.keys(userPres.connections).length === 0) {
+      userPres.online = false;
+      userPres.lastSeen = new Date().toISOString();
+    }
   }
 }
 
@@ -426,7 +470,7 @@ function getOnlineCount() {
   for (const userPres of presenceLedger.values()) {
     let activeConns = 0;
     for (const [cId, conn] of Object.entries(userPres.connections)) {
-      if (now - conn.lastSeen <= 90000) {
+      if (now - conn.lastSeen <= 35000) {
         activeConns++;
       } else {
         delete userPres.connections[cId];
@@ -435,7 +479,7 @@ function getOnlineCount() {
     userPres.online = activeConns > 0;
     if (userPres.online) count++;
   }
-  return Math.max(count, 1); // At least the administrator when checking
+  return Math.max(count, 1);
 }
 
 // -------------------------------------------------------------
@@ -626,6 +670,30 @@ async function handleAdminRequest(pathname, req, res, getRequestBody) {
       }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        success: true,
+        onlineCount: getOnlineCount(),
+        maintenanceEnabled: systemSettings.maintenanceEnabled
+      }));
+      return true;
+    } catch (_) {
+      res.statusCode = 200;
+      res.end('{}');
+      return true;
+    }
+  }
+
+  // -----------------------------------------------------------
+  // CLIENT DISCONNECT: POST /api/presence/disconnect
+  // -----------------------------------------------------------
+  if (pathname === '/api/presence/disconnect') {
+    try {
+      const body = await getRequestBody(req);
+      if (body.uid) {
+        removePresenceConnection(body.uid, body.connectionId);
+      }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ success: true, onlineCount: getOnlineCount() }));
       return true;
     } catch (_) {
@@ -633,6 +701,24 @@ async function handleAdminRequest(pathname, req, res, getRequestBody) {
       res.end('{}');
       return true;
     }
+  }
+
+  // -----------------------------------------------------------
+  // PUBLIC PLATFORM HEALTH & MAINTENANCE STATUS: GET /api/system/status
+  // -----------------------------------------------------------
+  if (pathname === '/api/system/status') {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({
+      maintenanceEnabled: systemSettings.maintenanceEnabled,
+      maintenanceMessage: systemSettings.maintenanceMessage,
+      maintenanceEndAt: systemSettings.maintenanceEndAt,
+      emergencyAiStop: systemSettings.emergencyAiStop,
+      disabledModels: systemSettings.disabledModels,
+      disabledProviders: systemSettings.disabledProviders,
+      onlineCount: getOnlineCount()
+    }));
+    return true;
   }
 
   // ===========================================================

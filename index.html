@@ -748,6 +748,25 @@
       </div>
     </div>
 
+    <!-- Dedicated Platform Maintenance Mode Screen (Locked when maintenance is enabled in /admin) -->
+    <div class="maintenance-screen-overlay hidden" id="maintenanceOverlay" role="dialog" aria-modal="true">
+      <div class="maintenance-card">
+        <div class="maintenance-icon-badge">
+          <i data-lucide="wrench" style="width: 32px; height: 32px; color: var(--accent-primary);"></i>
+        </div>
+        <div class="maintenance-brand">oska.AI V1</div>
+        <h1 class="maintenance-title">Platform Under Scheduled Maintenance</h1>
+        <p class="maintenance-message" id="maintenanceMessageText">We're making performance improvements and upgrading our AI gateways. We'll be back online shortly.</p>
+        <div class="maintenance-timer-badge hidden" id="maintenanceTimerBadge">
+          <i data-lucide="clock" style="width: 15px; height: 15px;"></i>
+          <span id="maintenanceTimerText">Expected completion: Shortly</span>
+        </div>
+        <div class="maintenance-footer-hint">
+          <span>Your conversations and projects are safe and will be accessible as soon as maintenance completes.</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
   </div>

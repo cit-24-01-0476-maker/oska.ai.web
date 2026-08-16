@@ -757,6 +757,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
   }
+
+  initClientPresence();
+  initPlatformMaintenanceWatcher();
 });
 
 // -------------------------------------------------------------
@@ -2943,4 +2946,117 @@ function showToast(message) {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 200);
   }, 2800);
+}
+
+// -------------------------------------------------------------
+// 22. Real-Time Client Presence & Heartbeat Engine
+// -------------------------------------------------------------
+const tabConnectionId = 'conn_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+
+function getDeviceId() {
+  let devId = localStorage.getItem('oska_device_id');
+  if (!devId) {
+    devId = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem('oska_device_id', devId);
+  }
+  return devId;
+}
+
+function getClientDeviceCategory() {
+  const ua = navigator.userAgent;
+  if (/android/i.test(ua)) return 'Mobile Android';
+  if (/iPad|iPhone|iPod/.test(ua)) return 'Mobile iOS';
+  if (/Macintosh/i.test(ua)) return 'Mac Desktop';
+  if (/Windows/i.test(ua)) return 'Windows Desktop';
+  if (/Linux/i.test(ua)) return 'Linux Desktop';
+  return 'Web Browser';
+}
+
+function sendPresenceHeartbeat() {
+  const payload = {
+    uid: state.user ? state.user.uid : 'anon_' + getDeviceId(),
+    email: state.user ? state.user.email : 'Guest Visitor (' + getClientDeviceCategory() + ')',
+    displayName: state.user ? (state.user.displayName || state.user.email.split('@')[0]) : 'Visitor',
+    photoURL: state.user?.photoURL || '',
+    connectionId: tabConnectionId,
+    device: getClientDeviceCategory(),
+    area: state.activeProjectId ? 'Project Workspace' : (state.currentConversationId ? 'Chat' : 'Home'),
+    activity: state.isGenerating ? 'Generating AI Reply' : (state.activeTool ? 'Using ' + state.activeTool : 'Active')
+  };
+
+  fetch('/api/presence/heartbeat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).catch(() => {});
+}
+
+function initClientPresence() {
+  sendPresenceHeartbeat();
+  setInterval(sendPresenceHeartbeat, 10000);
+
+  // Send disconnect beacon on tab/browser close
+  window.addEventListener('beforeunload', () => {
+    const data = JSON.stringify({
+      uid: state.user ? state.user.uid : 'anon_' + getDeviceId(),
+      connectionId: tabConnectionId
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/presence/disconnect', data);
+    }
+  });
+}
+
+// -------------------------------------------------------------
+// 23. Real-Time Platform Maintenance & Status Watcher
+// -------------------------------------------------------------
+async function checkPlatformMaintenanceStatus() {
+  try {
+    const res = await fetch('/api/system/status');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const overlay = document.getElementById('maintenanceOverlay');
+    const msgText = document.getElementById('maintenanceMessageText');
+    const timerBadge = document.getElementById('maintenanceTimerBadge');
+    const timerText = document.getElementById('maintenanceTimerText');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    if (data.maintenanceEnabled) {
+      if (overlay) overlay.classList.remove('hidden');
+      if (msgText && data.maintenanceMessage) {
+        msgText.textContent = data.maintenanceMessage;
+      }
+      if (data.maintenanceEndAt && timerBadge && timerText) {
+        timerBadge.classList.remove('hidden');
+        try {
+          const endD = new Date(data.maintenanceEndAt);
+          timerText.textContent = `Expected completion: ${endD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${endD.toLocaleDateString()})`;
+        } catch (_) {
+          timerText.textContent = `Expected completion: ${data.maintenanceEndAt}`;
+        }
+      } else if (timerBadge) {
+        timerBadge.classList.add('hidden');
+      }
+
+      if (chatInput) {
+        chatInput.disabled = true;
+        chatInput.placeholder = 'oska.AI is under scheduled maintenance...';
+      }
+      if (sendBtn) sendBtn.disabled = true;
+    } else {
+      if (overlay) overlay.classList.add('hidden');
+      if (chatInput && chatInput.disabled) {
+        chatInput.disabled = false;
+        chatInput.placeholder = window.innerWidth <= 768 ? 'Message oska.AI…' : 'Message oska.AI... (Shift + Enter for new line)';
+      }
+      if (sendBtn) sendBtn.disabled = false;
+    }
+  } catch (_) {}
+}
+
+function initPlatformMaintenanceWatcher() {
+  checkPlatformMaintenanceStatus();
+  setInterval(checkPlatformMaintenanceStatus, 8000);
 }
