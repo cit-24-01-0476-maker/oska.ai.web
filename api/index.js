@@ -587,9 +587,16 @@ module.exports = async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
         res.statusCode = 200;
 
+        // Emit status event so the client knows processing phase
+        res.write(`data: ${JSON.stringify({ type: 'status', status: 'thinking' })}\n\n`);
+
         if (result.reasoning) {
+          res.write(`data: ${JSON.stringify({ type: 'status', status: 'analyzing' })}\n\n`);
           res.write(`data: ${JSON.stringify({ type: 'reasoning', content: result.reasoning })}\n\n`);
         }
+
+        // Signal streaming phase
+        res.write(`data: ${JSON.stringify({ type: 'status', status: 'streaming' })}\n\n`);
 
         const tokens = result.content.match(/\S+|\s+/g) || [result.content];
         for (const token of tokens) {

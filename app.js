@@ -129,6 +129,7 @@ let state = {
   responseLanguage: 'auto', // 'auto' | 'english' | 'sinhala' | 'singlish'
   theme: localStorage.getItem('oska_theme') || 'light',
   isGenerating: false,
+  generationPhase: 'idle', // 'idle' | 'queued' | 'thinking' | 'analyzing' | 'tool' | 'streaming' | 'completed' | 'failed' | 'cancelled'
   attachments: [],
   activeTool: null,
   abortController: null,
@@ -1185,22 +1186,32 @@ async function handleSendMessage() {
   saveConversationsToStorage();
   renderConversationsList();
 
-  // Create Assistant Message Placeholder
+  // Create Assistant Message Placeholder with thinking indicator
   const assistantBubbleId = 'msg_' + Date.now();
   const assistantRow = appendMessageToDOM('assistant', '', '', null, null, null, assistantBubbleId);
   const bubbleContent = assistantRow.querySelector('.message-bubble');
 
+  // Determine initial contextual status based on prompt, attachments, and effort
+  const initialStatus = getContextualStatus(prompt, currentAttachments, state.reasoningEffort);
+
+  // Show the thinking indicator immediately
+  showThinkingIndicator(bubbleContent, initialStatus);
   setGeneratingState(true);
+  state.generationPhase = 'queued';
 
   // Handle Slash Commands (/image, /video)
   if (prompt.startsWith('/image ')) {
+    updateThinkingStatus(bubbleContent, 'Creating your image…');
     await handleImageGeneration(prompt.replace('/image ', ''), bubbleContent, conv);
+    state.generationPhase = 'completed';
     setGeneratingState(false);
     return;
   }
 
   if (prompt.startsWith('/video ')) {
+    updateThinkingStatus(bubbleContent, 'Generating your video…');
     await handleVideoGeneration(prompt.replace('/video ', ''), bubbleContent, conv);
+    state.generationPhase = 'completed';
     setGeneratingState(false);
     return;
   }
@@ -1210,13 +1221,24 @@ async function handleSendMessage() {
 
   // API Streaming Request with 35s timeout
   state.abortController = new AbortController();
+  let assistantText = '';
+  let reasoningText = '';
+  let streamStarted = false;
   const timeoutId = setTimeout(() => {
     if (state.abortController) {
       state.abortController.abort();
     }
   }, 35000);
 
+  // Slow-provider safeguard: if still thinking after 8s, update status
+  const slowTimerId = setTimeout(() => {
+    if (state.generationPhase === 'thinking' || state.generationPhase === 'queued') {
+      updateThinkingStatus(bubbleContent, 'Still working…');
+    }
+  }, 8000);
+
   try {
+    state.generationPhase = 'thinking';
     const messagesPayload = [
       { role: 'system', content: systemPrompt },
       ...conv.messages.slice(-8).map(m => ({ role: m.role, content: m.content }))
@@ -1242,22 +1264,24 @@ async function handleSendMessage() {
     });
 
     clearTimeout(timeoutId);
+    clearTimeout(slowTimerId);
 
     if (!response.ok) {
       const errJson = await response.json().catch(() => ({}));
       throw new Error(errJson.error?.message || `API returned status ${response.status}`);
     }
 
-    let assistantText = '';
-    let reasoningText = '';
     const contentType = response.headers.get('content-type') || '';
 
-    // If server returned direct JSON
+    // If server returned direct JSON (non-streaming)
     if (contentType.includes('application/json')) {
       const json = await response.json();
       assistantText = json.choices?.[0]?.message?.content || json.content || '';
       reasoningText = json.choices?.[0]?.message?.reasoning_content || json.reasoning || '';
-      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+      transitionToStreaming(bubbleContent);
+      streamStarted = true;
+      state.generationPhase = 'streaming';
+      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true);
       scrollChatToBottom();
     } else {
       // SSE Streaming Reader
@@ -1277,23 +1301,59 @@ async function handleSendMessage() {
             if (raw === '[DONE]') continue;
             try {
               const data = JSON.parse(raw);
+
+              // Handle status events from the server
+              if (data.type === 'status') {
+                state.generationPhase = data.status;
+                if (data.status === 'thinking') {
+                  updateThinkingStatus(bubbleContent, initialStatus);
+                } else if (data.status === 'analyzing') {
+                  updateThinkingStatus(bubbleContent, 'Analyzing…');
+                } else if (data.status === 'searching-web') {
+                  updateThinkingStatus(bubbleContent, 'Searching the web…');
+                } else if (data.status === 'reading-file') {
+                  updateThinkingStatus(bubbleContent, 'Reading the file…');
+                } else if (data.status === 'analyzing-data') {
+                  updateThinkingStatus(bubbleContent, 'Analyzing the data…');
+                } else if (data.status === 'streaming' && !streamStarted) {
+                  transitionToStreaming(bubbleContent);
+                  streamStarted = true;
+                }
+                continue;
+              }
+
               if (data.type === 'text') {
+                if (!streamStarted) {
+                  transitionToStreaming(bubbleContent);
+                  streamStarted = true;
+                  state.generationPhase = 'streaming';
+                }
                 assistantText += data.content;
-                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true);
               } else if (data.type === 'reasoning') {
                 reasoningText += data.content;
-                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+                // Don't expose reasoning to UI, but store it
               }
             } catch (e) {
+              if (!streamStarted) {
+                transitionToStreaming(bubbleContent);
+                streamStarted = true;
+                state.generationPhase = 'streaming';
+              }
               assistantText += raw;
-              updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+              updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true);
             }
           } else if (line.trim() && !line.startsWith(':')) {
             try {
               const data = JSON.parse(line.trim());
               if (data.choices?.[0]?.message?.content) {
+                if (!streamStarted) {
+                  transitionToStreaming(bubbleContent);
+                  streamStarted = true;
+                  state.generationPhase = 'streaming';
+                }
                 assistantText = data.choices[0].message.content;
-                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true);
               }
             } catch (_) {}
           }
@@ -1304,7 +1364,11 @@ async function handleSendMessage() {
 
     if (!assistantText.trim()) {
       assistantText = 'I am ready to assist with your questions, code, and analysis.';
-      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+      if (!streamStarted) transitionToStreaming(bubbleContent);
+      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false);
+    } else {
+      // Remove streaming cursor from final message
+      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false);
     }
 
     // Chart Generation for Spreadsheets
@@ -1320,21 +1384,28 @@ async function handleSendMessage() {
       chart: generatedChart
     });
 
+    state.generationPhase = 'completed';
     saveConversationsToStorage();
 
   } catch (err) {
     clearTimeout(timeoutId);
+    clearTimeout(slowTimerId);
     if (err.name === 'AbortError') {
-      showToast('Request completed / timed out');
-      if (!assistantText) {
-        bubbleContent.innerHTML = `<p style="color: var(--text-muted);"><em>Request finished.</em></p>`;
+      state.generationPhase = 'cancelled';
+      showToast('Generation stopped');
+      if (!streamStarted || !assistantText.trim()) {
+        showThinkingError(bubbleContent, 'Request timed out or was cancelled.', prompt);
+      } else {
+        updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false);
       }
     } else {
+      state.generationPhase = 'failed';
       console.error('Chat error:', err);
-      bubbleContent.innerHTML = `<p style="color: #ef4444;">⚠️ Response notice: ${escapeHtml(err.message || 'Check model availability')}</p>`;
+      showThinkingError(bubbleContent, err.message || 'Check model availability', prompt);
     }
   } finally {
     clearTimeout(timeoutId);
+    clearTimeout(slowTimerId);
     setGeneratingState(false);
   }
 }
@@ -1358,10 +1429,147 @@ function setGeneratingState(isGenerating) {
   } else {
     sendBtn.classList.remove('hidden');
     stopBtn.classList.add('hidden');
+    if (state.generationPhase !== 'streaming') {
+      state.generationPhase = 'idle';
+    }
     const input = document.getElementById('chatInput');
     sendBtn.disabled = !input.value.trim() && state.attachments.length === 0;
   }
 }
+
+// -------------------------------------------------------------
+// 17b. oska.AI Premium Thinking Indicator System
+// -------------------------------------------------------------
+
+/**
+ * Determine the initial contextual status label based on prompt content,
+ * attachments, and reasoning effort. Uses REAL context, not fake timers.
+ */
+function getContextualStatus(prompt, attachments, effort) {
+  const p = prompt.toLowerCase();
+
+  // Slash commands
+  if (p.startsWith('/search ') || p.startsWith('/web ')) return 'Searching the web…';
+  if (p.startsWith('/research ')) return 'Researching sources…';
+  if (p.startsWith('/image ')) return 'Creating your image…';
+  if (p.startsWith('/video ')) return 'Generating your video…';
+
+  // Attachment-based status
+  if (attachments.length > 0) {
+    const hasImage = attachments.some(a => a.type === 'image');
+    const hasSpreadsheet = attachments.some(a => a.chartData || (a.name && /\.(xlsx|csv|xls)$/i.test(a.name)));
+    const hasPDF = attachments.some(a => a.name && /\.pdf$/i.test(a.name));
+    if (hasImage) return 'Looking at the image…';
+    if (hasSpreadsheet) return 'Analyzing the spreadsheet…';
+    if (hasPDF) return `Reading ${attachments.find(a => /\.pdf$/i.test(a.name))?.name || 'the document'}…`;
+    return `Reading ${attachments[0]?.name || 'the file'}…`;
+  }
+
+  // Code-related prompts
+  if (p.includes('code') || p.includes('debug') || p.includes('function') || p.includes('algorithm') || p.includes('error') || p.includes('bug')) {
+    return effort === 'high' || effort === 'extra-high' || effort === 'pro' ? 'Analyzing…' : 'Thinking…';
+  }
+
+  // Reasoning effort-based
+  if (effort === 'instant') return 'Thinking…';
+  if (effort === 'medium') return 'Thinking…';
+  if (effort === 'high') return 'Analyzing…';
+  if (effort === 'extra-high' || effort === 'pro') return 'Analyzing your request…';
+
+  return 'Thinking…';
+}
+
+/**
+ * Render the oska.AI thinking indicator inside the assistant bubble.
+ * This replaces the empty bubble content with the branded indicator.
+ */
+function showThinkingIndicator(bubbleElement, statusText) {
+  const useShimmer = state.reasoningEffort !== 'instant';
+  bubbleElement.innerHTML = `
+    <div class="oska-thinking" id="oskaThinkingIndicator">
+      <div class="oska-thinking-mark">O</div>
+      <div class="oska-thinking-status${useShimmer ? ' shimmer' : ''}">
+        <span class="oska-thinking-label">${escapeHtml(statusText)}</span>
+        <span class="oska-thinking-dots"><span></span><span></span><span></span></span>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Smoothly update the thinking status label with a fade transition.
+ */
+function updateThinkingStatus(bubbleElement, newStatus) {
+  const label = bubbleElement.querySelector('.oska-thinking-label');
+  if (!label) return;
+  if (label.textContent === newStatus) return;
+
+  label.classList.add('fading');
+  setTimeout(() => {
+    label.textContent = newStatus;
+    label.classList.remove('fading');
+  }, 180);
+}
+
+/**
+ * Transition from thinking indicator to streaming content.
+ * Dissolves the indicator, then shows the response mark + content area.
+ */
+function transitionToStreaming(bubbleElement) {
+  const indicator = bubbleElement.querySelector('#oskaThinkingIndicator');
+  if (indicator) {
+    indicator.classList.add('dissolving');
+    setTimeout(() => {
+      indicator.remove();
+    }, 250);
+  }
+}
+
+/**
+ * Show an error state where the thinking indicator was, with a Retry button.
+ */
+function showThinkingError(bubbleElement, message, originalPrompt) {
+  bubbleElement.innerHTML = `
+    <div class="oska-thinking">
+      <div class="oska-thinking-mark" style="animation: none; opacity: 0.5;">O</div>
+      <div class="oska-thinking-error">
+        <span>Couldn't generate a response. ${escapeHtml(message)}</span>
+        <button type="button" class="oska-retry-btn" onclick="retryLastMessage()">Retry</button>
+      </div>
+    </div>
+  `;
+}
+
+/** Retry the last user message */
+window.retryLastMessage = function() {
+  const conv = state.conversations.find(c => c.id === state.activeConversationId);
+  if (!conv || conv.messages.length === 0) return;
+
+  // Find the last user message
+  const lastUserMsg = [...conv.messages].reverse().find(m => m.role === 'user');
+  if (!lastUserMsg) return;
+
+  // Remove the failed assistant message from DOM (last .message-row.assistant)
+  const container = document.getElementById('conversationContainer');
+  const lastAssistantRow = container?.querySelector('.message-row.assistant:last-child');
+  if (lastAssistantRow) lastAssistantRow.remove();
+
+  // Remove the failed assistant message from conversation data (if it exists)
+  if (conv.messages[conv.messages.length - 1]?.role === 'assistant') {
+    conv.messages.pop();
+  }
+  // Also remove the user message so handleSendMessage re-adds it
+  conv.messages.pop();
+
+  // Remove the user message row from DOM
+  const lastUserRow = container?.querySelector('.message-row.user:last-child');
+  if (lastUserRow) lastUserRow.remove();
+
+  // Re-send
+  const input = document.getElementById('chatInput');
+  input.value = lastUserMsg.content;
+  handleSendMessage();
+};
 
 // -------------------------------------------------------------
 // 18. Image & Video Generation Handlers
@@ -1483,8 +1691,12 @@ function appendMessageToDOM(role, content, reasoning, media, citations, chart, r
   return row;
 }
 
-function updateAssistantMessageDOM(bubbleElement, text, reasoning) {
+function updateAssistantMessageDOM(bubbleElement, text, reasoning, isStreaming) {
   let html = '';
+
+  // Small oska.AI mark at top of response
+  html += '<div class="oska-response-mark">O</div>';
+
   if (reasoning) {
     html += `
       <div class="reasoning-box">
@@ -1496,7 +1708,15 @@ function updateAssistantMessageDOM(bubbleElement, text, reasoning) {
       </div>
     `;
   }
+
+  html += '<div class="oska-stream-content">';
   html += renderMarkdown(text);
+  // Show streaming cursor while actively streaming
+  if (isStreaming) {
+    html += '<span class="oska-stream-cursor"></span>';
+  }
+  html += '</div>';
+
   bubbleElement.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }

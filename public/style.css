@@ -2117,3 +2117,284 @@ button, input, textarea, select {
     font-size: 0.7rem;
   }
 }
+
+/* -------------------------------------------------------------
+   oska.AI Premium Thinking Indicator
+   ------------------------------------------------------------- */
+
+/* Thinking container — occupies the same space as the response will */
+.oska-thinking {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.6rem 0;
+  min-height: 2.2rem;
+  animation: oskaFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The small oska logo mark */
+.oska-thinking-mark {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 7px;
+  background-color: var(--bg-surface-active);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent-primary);
+  animation: oskaPulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: transform, opacity;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Subtle light trail sweep across the mark */
+.oska-thinking-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgba(194, 65, 12, 0.08) 48%,
+    transparent 66%
+  );
+  animation: oskaShimmerSweep 2.4s ease-in-out infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+[data-theme="dark"] .oska-thinking-mark {
+  background-color: var(--bg-surface-hover);
+  color: var(--accent-primary);
+}
+
+[data-theme="dark"] .oska-thinking-mark::after {
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgba(234, 88, 12, 0.1) 48%,
+    transparent 66%
+  );
+}
+
+/* Status text */
+.oska-thinking-status {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-weight: 450;
+  letter-spacing: 0.005em;
+  line-height: 1.5;
+  min-height: 24px;
+  position: relative;
+}
+
+/* Animated dots */
+.oska-thinking-dots {
+  display: inline-flex;
+  gap: 2.5px;
+  margin-left: 1px;
+  align-items: center;
+  height: 24px;
+}
+
+.oska-thinking-dots span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+  opacity: 0.35;
+  animation: oskaDotFade 1.4s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.oska-thinking-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.oska-thinking-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Status text transition for smooth label changes */
+.oska-thinking-label {
+  transition: opacity 180ms ease;
+}
+
+.oska-thinking-label.fading {
+  opacity: 0;
+}
+
+/* Shimmer across the status text */
+.oska-thinking-status.shimmer .oska-thinking-label {
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--text-secondary) 40%,
+    var(--text-muted) 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: oskaTextShimmer 2.8s ease-in-out infinite;
+}
+
+/* Transition from thinking to streaming — the indicator fades out */
+.oska-thinking.dissolving {
+  animation: oskaDissolve 250ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Error state inside thinking */
+.oska-thinking-error {
+  color: #ef4444;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.oska-thinking-error .oska-retry-btn {
+  background: transparent;
+  border: 1px solid var(--border-medium);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.oska-thinking-error .oska-retry-btn:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-focus);
+  color: var(--accent-primary);
+}
+
+/* Small oska mark at the top of the streamed response */
+.oska-response-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background-color: var(--bg-surface-active);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.35rem;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .oska-response-mark {
+  background-color: var(--bg-surface-hover);
+}
+
+/* Streaming cursor */
+.oska-stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: var(--accent-primary);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: oskaCursorBlink 0.8s step-end infinite;
+  will-change: opacity;
+}
+
+/* Smooth entry for streamed content */
+.oska-stream-content {
+  animation: oskaContentFadeIn 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* --- Keyframe Animations (GPU-only: transform + opacity) --- */
+
+@keyframes oskaFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes oskaPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.04); opacity: 0.85; }
+}
+
+@keyframes oskaDotFade {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 0.8; }
+}
+
+@keyframes oskaShimmerSweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes oskaTextShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes oskaDissolve {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-3px); }
+}
+
+@keyframes oskaCursorBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+@keyframes oskaContentFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* --- Reduced Motion --- */
+
+@media (prefers-reduced-motion: reduce) {
+  .oska-thinking-mark {
+    animation: none;
+  }
+  .oska-thinking-mark::after {
+    animation: none;
+    display: none;
+  }
+  .oska-thinking-dots span {
+    animation: none;
+    opacity: 0.5;
+  }
+  .oska-thinking-status.shimmer .oska-thinking-label {
+    animation: none;
+    -webkit-text-fill-color: var(--text-muted);
+    background: none;
+  }
+  .oska-thinking {
+    animation: none;
+    opacity: 1;
+  }
+  .oska-thinking.dissolving {
+    animation: none;
+    display: none;
+  }
+  .oska-stream-cursor {
+    animation: none;
+    opacity: 1;
+  }
+  .oska-stream-content {
+    animation: none;
+    opacity: 1;
+  }
+}
