@@ -117,6 +117,63 @@ const REASONING_EFFORT_CONFIG = {
   'pro': { label: 'Pro', budgetTokens: 16384, desc: 'Comprehensive multi-step analysis' }
 };
 
+const BEHAVIOR_MODES = [
+  {
+    id: 'auto',
+    name: 'Auto',
+    tag: 'Adaptive Intelligence',
+    desc: 'Automatically chooses optimal behavior & tools'
+  },
+  {
+    id: 'general',
+    name: 'General',
+    tag: 'Everyday Assistant',
+    desc: 'Thoughtful, balanced conversational assistant'
+  },
+  {
+    id: 'direct',
+    name: 'Direct',
+    tag: 'Concise & Actionable',
+    desc: 'Direct, concise, no disclaimers or moralizing filler'
+  },
+  {
+    id: 'coder',
+    name: 'Coder',
+    tag: 'Senior Engineer',
+    desc: 'Software architecture, debugging, production code'
+  },
+  {
+    id: 'academic',
+    name: 'Academic',
+    tag: 'Scholarly Research',
+    desc: 'Rigorous analysis, structured thesis style, citations'
+  },
+  {
+    id: 'research',
+    name: 'Research',
+    tag: 'Evidence Synthesis',
+    desc: 'Deep multi-source comparison and source citations'
+  },
+  {
+    id: 'data-analyst',
+    name: 'Data Analyst',
+    tag: 'Computation & Stats',
+    desc: 'Calculations, data tables, anomalies, and charts'
+  },
+  {
+    id: 'creative',
+    name: 'Creative',
+    tag: 'Ideation & Metaphor',
+    desc: 'Compelling writing, storytelling, visual concepts'
+  },
+  {
+    id: 'custom',
+    name: 'Custom',
+    tag: 'User Persona',
+    desc: 'User-defined custom instructions'
+  }
+];
+
 // -------------------------------------------------------------
 // 3. Application State Store
 // -------------------------------------------------------------
@@ -124,8 +181,13 @@ let state = {
   user: null,
   conversations: [],
   activeConversationId: null,
+  projects: JSON.parse(localStorage.getItem('oska_projects') || '[]'),
+  activeProjectId: null,
+  libraryFiles: JSON.parse(localStorage.getItem('oska_library') || '[]'),
   selectedModel: 'gemini-3.7-flash',
   reasoningEffort: 'extra-high',
+  selectedMode: localStorage.getItem('oska_mode') || 'auto',
+  customModeInstructions: localStorage.getItem('oska_custom_mode_prompt') || '',
   responseLanguage: 'auto', // 'auto' | 'english' | 'sinhala' | 'singlish'
   theme: localStorage.getItem('oska_theme') || 'light',
   isGenerating: false,
@@ -198,12 +260,33 @@ function buildLanguageSystemPrompt(userText, selectedLang) {
 }
 
 // -------------------------------------------------------------
-// 6. Universal Document & File Parsers
+// 6. Universal Document & Multimodal File Parsers
 // -------------------------------------------------------------
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function getFileIconName(type) {
+  switch (type) {
+    case 'pdf': return 'file-text';
+    case 'docx': return 'file-edit';
+    case 'pptx': return 'presentation';
+    case 'spreadsheet': return 'table';
+    case 'image': return 'image';
+    case 'code': return 'file-code';
+    default: return 'paperclip';
+  }
+}
+
 async function parseUploadedFile(file) {
   const fileName = file.name;
   const ext = fileName.split('.').pop().toLowerCase();
   const fileType = file.type;
+  const fileSize = file.size;
 
   // 1. Images
   if (fileType.startsWith('image/')) {
@@ -211,9 +294,11 @@ async function parseUploadedFile(file) {
       const reader = new FileReader();
       reader.onload = (e) => {
         resolve({
+          id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
           name: fileName,
           type: 'image',
           mimeType: fileType,
+          size: fileSize,
           dataUrl: e.target.result,
           base64: e.target.result.split(',')[1],
           textContext: `[Uploaded Image: ${fileName}]`
@@ -226,58 +311,115 @@ async function parseUploadedFile(file) {
   // 2. PDF Documents
   if (ext === 'pdf' || fileType === 'application/pdf') {
     try {
+      const arrayBuffer = await file.arrayBuffer();
+      let extractedText = '';
+      let pageCount = 1;
+
       if (typeof pdfjsLib !== 'undefined') {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let extractedText = '';
-        for (let i = 1; i <= Math.min(pdf.numPages, 30); i++) {
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+        pageCount = pdf.numPages;
+        for (let i = 1; i <= Math.min(pageCount, 35); i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
           const pageText = textContent.items.map(item => item.str).join(' ');
-          extractedText += `\n--- [PDF Page ${i}/${pdf.numPages}] ---\n${pageText}\n`;
+          extractedText += `\n--- [PDF Page ${i}/${pageCount}] ---\n${pageText}\n`;
         }
-        return {
-          name: fileName,
-          type: 'pdf',
-          textContext: `Document [${fileName}] Content (${pdf.numPages} pages):\n${extractedText.slice(0, 40000)}`
-        };
       }
+
+      return {
+        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        name: fileName,
+        type: 'pdf',
+        size: fileSize,
+        pageCount: pageCount,
+        arrayBuffer: arrayBuffer,
+        textContext: `Document [${fileName}] Content (${pageCount} pages):\n${extractedText.slice(0, 45000)}`
+      };
     } catch (e) {
-      console.warn('PDF parse fallback:', e);
+      console.warn('PDF parse notice:', e);
     }
   }
 
   // 3. Word Documents (.docx)
   if (ext === 'docx') {
     try {
+      const arrayBuffer = await file.arrayBuffer();
+      let htmlOutput = '';
+      let rawText = '';
+
       if (typeof mammoth !== 'undefined') {
-        const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        return {
-          name: fileName,
-          type: 'docx',
-          textContext: `Word Document [${fileName}] Content:\n${result.value.slice(0, 40000)}`
-        };
+        const resHtml = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer.slice(0) }).catch(() => null);
+        if (resHtml) htmlOutput = resHtml.value;
+        const resText = await mammoth.extractRawText({ arrayBuffer: arrayBuffer.slice(0) }).catch(() => null);
+        if (resText) rawText = resText.value;
       }
+
+      return {
+        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        name: fileName,
+        type: 'docx',
+        size: fileSize,
+        arrayBuffer: arrayBuffer,
+        htmlContent: htmlOutput,
+        rawContent: rawText,
+        textContext: `Word Document [${fileName}] Content:\n${(rawText || htmlOutput).slice(0, 45000)}`
+      };
     } catch (e) {
-      console.warn('DOCX parse fallback:', e);
+      console.warn('DOCX parse notice:', e);
     }
   }
 
-  // 4. Spreadsheets (.xlsx, .xls, .csv) with Statistical Summaries
-  if (['xlsx', 'xls', 'csv'].includes(ext)) {
+  // 4. PowerPoint Presentations (.pptx)
+  if (ext === 'pptx') {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const textDecoder = new TextDecoder('utf-8');
+      const rawString = textDecoder.decode(new Uint8Array(arrayBuffer));
+      // Extract slide texts from XML fragments
+      const textMatches = rawString.match(/<a:t>([^<]+)<\/a:t>/g) || [];
+      const cleanedFragments = textMatches.map(m => m.replace(/<\/?a:t>/g, '').trim()).filter(Boolean);
+      
+      const slides = [];
+      const chunkSize = Math.max(3, Math.ceil(cleanedFragments.length / 8));
+      for (let i = 0; i < cleanedFragments.length; i += chunkSize) {
+        slides.push({
+          number: slides.length + 1,
+          title: `Slide ${slides.length + 1}`,
+          text: cleanedFragments.slice(i, i + chunkSize).join(' ')
+        });
+      }
+
+      const summaryText = slides.map(s => `[Slide ${s.number}]: ${s.text}`).join('\n\n');
+
+      return {
+        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        name: fileName,
+        type: 'pptx',
+        size: fileSize,
+        slides: slides.length ? slides : [{ number: 1, title: 'Slide 1', text: 'Presentation loaded.' }],
+        textContext: `PowerPoint [${fileName}] Slides (${slides.length} slides):\n${summaryText.slice(0, 40000)}`
+      };
+    } catch (e) {
+      console.warn('PPTX parse notice:', e);
+    }
+  }
+
+  // 5. Spreadsheets (.xlsx, .xls, .csv, .tsv)
+  if (['xlsx', 'xls', 'csv', 'tsv'].includes(ext)) {
     try {
       if (typeof XLSX !== 'undefined') {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         let summaryText = `Spreadsheet [${fileName}] Overview:\n`;
+        const sheets = [];
         let chartableData = null;
 
         workbook.SheetNames.forEach((sheetName) => {
           const sheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
           if (jsonData.length > 0) {
+            sheets.push({ name: sheetName, data: jsonData });
             summaryText += `\nSheet: "${sheetName}" (${jsonData.length} rows, ${jsonData[0] ? jsonData[0].length : 0} cols)\n`;
             const previewRows = jsonData.slice(0, 25);
             summaryText += previewRows.map(row => (Array.isArray(row) ? row.join(' | ') : '')).join('\n') + '\n';
@@ -288,30 +430,255 @@ async function parseUploadedFile(file) {
         });
 
         return {
+          id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
           name: fileName,
           type: 'spreadsheet',
+          size: fileSize,
+          sheets: sheets,
+          sheetData: sheets[0] ? sheets[0].data : [],
           chartData: chartableData,
           textContext: summaryText
         };
       }
     } catch (e) {
-      console.warn('Spreadsheet parse fallback:', e);
+      console.warn('Spreadsheet parse notice:', e);
     }
   }
 
-  // 5. Code, Markdown, JSON, Text
+  // 6. Code, Markdown, JSON, Structured Text
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target.result;
+      const isCode = ['js', 'ts', 'tsx', 'jsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs', 'php', 'html', 'css', 'sql', 'sh', 'json'].includes(ext);
       resolve({
+        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
         name: fileName,
-        type: 'text',
-        textContext: `Attached File [${fileName}]:\n\`\`\`${ext}\n${text.slice(0, 40000)}\n\`\`\``
+        type: isCode ? 'code' : 'text',
+        size: fileSize,
+        rawContent: text,
+        textContext: `Attached File [${fileName}]:\n\`\`\`${ext}\n${text.slice(0, 45000)}\n\`\`\``
       });
     };
     reader.readAsText(file);
   });
+}
+
+// -------------------------------------------------------------
+// Universal File Preview Engine (Modal & Reader)
+// -------------------------------------------------------------
+let activePreviewDoc = null;
+let activePdfInstance = null;
+let currentPdfPageNum = 1;
+let pdfScale = 1.1;
+
+function openFilePreview(item) {
+  if (!item) return;
+  const modal = document.getElementById('filePreviewModal');
+  const title = document.getElementById('filePreviewTitle');
+  const subtitle = document.getElementById('filePreviewSubtitle');
+  const body = document.getElementById('filePreviewBody');
+  const downloadBtn = document.getElementById('previewDownloadBtn');
+  const attachBtn = document.getElementById('previewAttachChatBtn');
+  if (!modal || !body) return;
+
+  activePreviewDoc = item;
+  title.textContent = item.name || 'Document Preview';
+  subtitle.textContent = `${(item.type || 'Document').toUpperCase()} · ${item.size ? formatFileSize(item.size) : 'Ready'}`;
+
+  if (item.dataUrl) {
+    downloadBtn.href = item.dataUrl;
+    downloadBtn.setAttribute('download', item.name || 'download');
+    downloadBtn.style.display = 'inline-flex';
+  } else {
+    downloadBtn.style.display = 'none';
+  }
+
+  attachBtn.onclick = () => {
+    state.attachments.push(item);
+    renderAttachmentBar();
+    modal.classList.add('hidden');
+    showToast(`Attached ${item.name} to chat`);
+  };
+
+  body.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:200px;"><span class="pulse-dot"></span> Loading preview...</div>';
+  modal.classList.remove('hidden');
+
+  // Route preview by file type
+  if (item.type === 'pdf') {
+    renderPdfPreview(item, body);
+  } else if (item.type === 'docx') {
+    renderDocxPreview(item, body);
+  } else if (item.type === 'pptx') {
+    renderPptxPreview(item, body);
+  } else if (item.type === 'spreadsheet') {
+    renderSpreadsheetPreview(item, body);
+  } else if (item.type === 'image') {
+    body.innerHTML = `
+      <div class="image-lightbox-wrapper">
+        <img src="${item.dataUrl}" alt="${escapeHtml(item.name)}">
+      </div>
+    `;
+  } else {
+    const raw = item.rawContent || item.textContext || 'No preview available.';
+    body.innerHTML = `
+      <pre class="code-preview-block"><code>${escapeHtml(raw)}</code></pre>
+    `;
+    if (typeof hljs !== 'undefined') {
+      body.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+    }
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeFilePreview() {
+  const modal = document.getElementById('filePreviewModal');
+  if (modal) modal.classList.add('hidden');
+  activePreviewDoc = null;
+  activePdfInstance = null;
+}
+
+async function renderPdfPreview(item, container) {
+  try {
+    if (!item.arrayBuffer && item.dataUrl) {
+      const res = await fetch(item.dataUrl);
+      item.arrayBuffer = await res.arrayBuffer();
+    }
+    if (typeof pdfjsLib !== 'undefined' && item.arrayBuffer) {
+      const pdf = await pdfjsLib.getDocument({ data: item.arrayBuffer }).promise;
+      activePdfInstance = pdf;
+      currentPdfPageNum = 1;
+      pdfScale = 1.1;
+
+      container.innerHTML = `
+        <div class="pdf-preview-container">
+          <div class="pdf-toolbar">
+            <button type="button" class="icon-btn" onclick="changePdfPage(-1)" title="Previous page"><i data-lucide="chevron-left" style="width:14px;height:14px;"></i></button>
+            <span id="pdfPageIndicator">Page 1 of ${pdf.numPages}</span>
+            <button type="button" class="icon-btn" onclick="changePdfPage(1)" title="Next page"><i data-lucide="chevron-right" style="width:14px;height:14px;"></i></button>
+            <span style="color:var(--border-medium); margin: 0 4px;">|</span>
+            <button type="button" class="icon-btn" onclick="zoomPdf(-0.2)" title="Zoom Out"><i data-lucide="zoom-out" style="width:14px;height:14px;"></i></button>
+            <span id="pdfZoomIndicator">110%</span>
+            <button type="button" class="icon-btn" onclick="zoomPdf(0.2)" title="Zoom In"><i data-lucide="zoom-in" style="width:14px;height:14px;"></i></button>
+          </div>
+          <div class="pdf-canvas-wrapper">
+            <canvas id="pdfPreviewCanvas"></canvas>
+          </div>
+        </div>
+      `;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+      drawPdfPage(1);
+      return;
+    }
+  } catch (err) {
+    console.warn('PDF preview rendering notice:', err);
+  }
+  container.innerHTML = `<div class="docx-preview-content"><p>${escapeHtml(item.textContext || 'PDF text content.')}</p></div>`;
+}
+
+async function drawPdfPage(num) {
+  if (!activePdfInstance) return;
+  const page = await activePdfInstance.getPage(num);
+  const canvas = document.getElementById('pdfPreviewCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const viewport = page.getViewport({ scale: pdfScale });
+  canvas.height = viewport.height;
+  canvas.width = viewport.width;
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const pageIndicator = document.getElementById('pdfPageIndicator');
+  if (pageIndicator) pageIndicator.textContent = `Page ${num} of ${activePdfInstance.numPages}`;
+}
+
+window.changePdfPage = function(delta) {
+  if (!activePdfInstance) return;
+  const newPage = currentPdfPageNum + delta;
+  if (newPage >= 1 && newPage <= activePdfInstance.numPages) {
+    currentPdfPageNum = newPage;
+    drawPdfPage(currentPdfPageNum);
+  }
+};
+
+window.zoomPdf = function(delta) {
+  pdfScale = Math.max(0.6, Math.min(2.4, pdfScale + delta));
+  const zoomIndicator = document.getElementById('pdfZoomIndicator');
+  if (zoomIndicator) zoomIndicator.textContent = `${Math.round(pdfScale * 100)}%`;
+  drawPdfPage(currentPdfPageNum);
+};
+
+function renderDocxPreview(item, container) {
+  if (item.htmlContent) {
+    container.innerHTML = `<div class="docx-preview-content">${item.htmlContent}</div>`;
+    return;
+  }
+  container.innerHTML = `<div class="docx-preview-content"><p>${escapeHtml(item.rawContent || item.textContext || 'Document content')}</p></div>`;
+}
+
+function renderPptxPreview(item, container) {
+  const slides = item.slides || [
+    { number: 1, title: 'Slide 1', text: item.textContext || 'Presentation content' }
+  ];
+  container.innerHTML = `
+    <div class="pptx-slide-deck">
+      ${slides.map(s => `
+        <div class="pptx-slide-card">
+          <div class="slide-counter">Slide ${s.number}</div>
+          <div class="slide-title">${escapeHtml(s.title || `Slide ${s.number}`)}</div>
+          <div class="slide-body-text">${escapeHtml(s.text || '')}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderSpreadsheetPreview(item, container) {
+  const sheets = item.sheets && item.sheets.length ? item.sheets : [{ name: 'Sheet1', data: item.sheetData || [] }];
+
+  function renderSheetView(sheetIdx) {
+    const targetSheet = sheets[sheetIdx] || sheets[0];
+    const data = targetSheet.data || [];
+    const headers = data[0] || [];
+    const rows = data.slice(1, 100);
+
+    container.innerHTML = `
+      <div class="spreadsheet-preview-container">
+        ${sheets.length > 1 ? `
+          <div class="sheet-tabs-bar">
+            ${sheets.map((s, idx) => `
+              <button type="button" class="sheet-tab-btn ${idx === sheetIdx ? 'active' : ''}" onclick="switchPreviewSheet(${idx})">
+                ${escapeHtml(s.name)}
+              </button>
+            `).join('')}
+          </div>
+        ` : ''}
+        <div class="spreadsheet-preview-table-wrapper">
+          <table class="spreadsheet-preview-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;">#</th>
+                ${headers.map(h => `<th>${escapeHtml(String(h))}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row, rIdx) => `
+                <tr>
+                  <td style="color: var(--text-muted); font-size: 0.7rem;">${rIdx + 1}</td>
+                  ${headers.map((_, colIdx) => `<td>${escapeHtml(String(row[colIdx] !== undefined ? row[colIdx] : ''))}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  window.switchPreviewSheet = function(idx) {
+    renderSheetView(idx);
+  };
+
+  renderSheetView(0);
 }
 
 // -------------------------------------------------------------
@@ -361,7 +728,13 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSpeechRecognition();
   renderModelPopoverList();
   renderEffortPopoverList();
+  renderModePopoverList();
+  renderProjectsSidebar();
   renderConversationsList();
+
+  const mode = BEHAVIOR_MODES.find(m => m.id === state.selectedMode) || BEHAVIOR_MODES[0];
+  const modeLabel = document.getElementById('composerModeLabel');
+  if (modeLabel) modeLabel.textContent = mode.name;
 
   if (typeof hljs !== 'undefined') {
     hljs.configure({ ignoreUnescapedHTML: true });
@@ -613,16 +986,102 @@ function setupUIEventListeners() {
     });
   });
 
-  // Model & Reasoning Popovers
-  composerModelBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    togglePopover('composerModelPopover');
-  });
+    // Model, Effort, and Mode Popovers
+    composerModelBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover('composerModelPopover');
+    });
 
-  composerEffortBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    togglePopover('composerEffortPopover');
-  });
+    composerEffortBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover('composerEffortPopover');
+    });
+
+    const composerModeBtn = document.getElementById('composerModeBtn');
+    if (composerModeBtn) {
+      composerModeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePopover('composerModePopover');
+      });
+    }
+
+    // Projects UI Events
+    const sidebarNewProjectBtn = document.getElementById('sidebarNewProjectBtn');
+    if (sidebarNewProjectBtn) {
+      sidebarNewProjectBtn.addEventListener('click', () => {
+        requireAuth(() => openNewProjectModal());
+      });
+    }
+
+    const closeProjectModalBtn = document.getElementById('closeProjectModalBtn');
+    const cancelProjectBtn = document.getElementById('cancelProjectBtn');
+    if (closeProjectModalBtn) closeProjectModalBtn.addEventListener('click', closeProjectModal);
+    if (cancelProjectBtn) cancelProjectBtn.addEventListener('click', closeProjectModal);
+
+    // Color dots for projects
+    document.querySelectorAll('#projectColorPicker .color-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        document.querySelectorAll('#projectColorPicker .color-dot').forEach(d => d.classList.remove('active'));
+        dot.classList.add('active');
+      });
+    });
+
+    const projectUploadFileBtn = document.getElementById('projectUploadFileBtn');
+    const projectFileInput = document.getElementById('projectFileInput');
+    if (projectUploadFileBtn && projectFileInput) {
+      projectUploadFileBtn.addEventListener('click', () => {
+        requireAuth(() => projectFileInput.click());
+      });
+      projectFileInput.addEventListener('change', (e) => {
+        handleProjectFileUpload(e);
+      });
+    }
+
+    const projectNewChatBtn = document.getElementById('projectNewChatBtn');
+    if (projectNewChatBtn) {
+      projectNewChatBtn.addEventListener('click', () => {
+        if (state.activeProjectId) {
+          startProjectChat(state.activeProjectId);
+        } else {
+          createNewConversation();
+        }
+      });
+    }
+
+    const projectSettingsBtn = document.getElementById('projectSettingsBtn');
+    if (projectSettingsBtn) {
+      projectSettingsBtn.addEventListener('click', () => {
+        if (state.activeProjectId) {
+          openNewProjectModal(state.activeProjectId);
+        }
+      });
+    }
+
+    // Library UI Events
+    const openLibraryBtn = document.getElementById('openLibraryBtn');
+    const closeLibraryBtn = document.getElementById('closeLibraryBtn');
+    if (openLibraryBtn) {
+      openLibraryBtn.addEventListener('click', () => {
+        requireAuth(() => openLibraryModal());
+      });
+    }
+    if (closeLibraryBtn) {
+      closeLibraryBtn.addEventListener('click', closeLibraryModal);
+    }
+
+    document.querySelectorAll('#libraryFilterTabs .library-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('#libraryFilterTabs .library-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderLibraryGrid(tab.getAttribute('data-filter') || 'all');
+      });
+    });
+
+    // File Preview Modal Close
+    const closeFilePreviewBtn = document.getElementById('closeFilePreviewBtn');
+    if (closeFilePreviewBtn) {
+      closeFilePreviewBtn.addEventListener('click', closeFilePreview);
+    }
 
   // Profile Button: If unauthenticated, directly open Google login modal; if logged in, open account dropdown
   userProfileBtn.addEventListener('click', (e) => {
@@ -1087,6 +1546,387 @@ function setupSpeechRecognition() {
 }
 
 // -------------------------------------------------------------
+// 15b. Behavior Mode Management & Popover
+// -------------------------------------------------------------
+function renderModePopoverList() {
+  const container = document.getElementById('modePopoverList');
+  if (!container) return;
+
+  container.innerHTML = BEHAVIOR_MODES.map(mode => `
+    <button type="button" class="popover-item ${mode.id === state.selectedMode ? 'active' : ''}" data-mode-id="${mode.id}">
+      <div class="popover-item-left">
+        <div>
+          <div class="item-title">${mode.name} <span class="mode-item-badge">${mode.tag}</span></div>
+          <div class="item-desc">${mode.desc}</div>
+        </div>
+      </div>
+      <span class="check-icon">✓</span>
+    </button>
+  `).join('');
+
+  container.querySelectorAll('.popover-item').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const modeId = btn.getAttribute('data-mode-id');
+      selectBehaviorMode(modeId);
+      hideAllPopovers();
+    });
+  });
+}
+
+function selectBehaviorMode(modeId) {
+  const mode = BEHAVIOR_MODES.find(m => m.id === modeId) || BEHAVIOR_MODES[0];
+  state.selectedMode = mode.id;
+  localStorage.setItem('oska_mode', mode.id);
+
+  if (modeId === 'custom' && !state.customModeInstructions) {
+    const customPrompt = prompt('Enter custom system instructions for oska.AI:', state.customModeInstructions || '');
+    if (customPrompt !== null) {
+      state.customModeInstructions = customPrompt;
+      localStorage.setItem('oska_custom_mode_prompt', customPrompt);
+    }
+  }
+
+  const label = document.getElementById('composerModeLabel');
+  if (label) label.textContent = mode.name;
+  renderModePopoverList();
+  showToast(`Behavior mode: ${mode.name}`);
+}
+
+// -------------------------------------------------------------
+// 15c. Projects System (Workspaces & Knowledge Base)
+// -------------------------------------------------------------
+function renderProjectsSidebar() {
+  const list = document.getElementById('sidebarProjectsList');
+  if (!list) return;
+
+  if (!state.user || !state.projects.length) {
+    list.innerHTML = `<div style="padding: 0.35rem 0.5rem; font-size: 0.72rem; color: var(--text-muted);">No projects yet</div>`;
+    return;
+  }
+
+  list.innerHTML = state.projects.map(p => `
+    <div class="sidebar-project-item ${p.id === state.activeProjectId ? 'active' : ''}" onclick="openProjectWorkspace('${p.id}')" title="${escapeHtml(p.name)}">
+      <div class="project-item-left">
+        <span class="project-color-dot" style="background-color: ${p.color || '#c2410c'};"></span>
+        <span class="project-item-name">${escapeHtml(p.name)}</span>
+      </div>
+      <button type="button" class="chat-action-btn" onclick="event.stopPropagation(); deleteProject('${p.id}')" title="Delete Project">
+        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+      </button>
+    </div>
+  `).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function openNewProjectModal(editProjectId) {
+  const modal = document.getElementById('projectModal');
+  const title = document.getElementById('projectModalTitle');
+  const nameInput = document.getElementById('projectNameInput');
+  const instructionsInput = document.getElementById('projectInstructionsInput');
+  const saveBtn = document.getElementById('saveProjectBtn');
+  if (!modal) return;
+
+  if (editProjectId) {
+    const proj = state.projects.find(p => p.id === editProjectId);
+    if (proj) {
+      title.textContent = 'Project Settings';
+      nameInput.value = proj.name;
+      instructionsInput.value = proj.instructions || '';
+      saveBtn.textContent = 'Save Changes';
+      modal.setAttribute('data-edit-id', editProjectId);
+    }
+  } else {
+    title.textContent = 'New Project';
+    nameInput.value = '';
+    instructionsInput.value = '';
+    saveBtn.textContent = 'Create Project';
+    modal.removeAttribute('data-edit-id');
+  }
+
+  modal.classList.remove('hidden');
+  nameInput.focus();
+}
+
+function closeProjectModal() {
+  const modal = document.getElementById('projectModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+window.saveProject = function() {
+  const modal = document.getElementById('projectModal');
+  const nameInput = document.getElementById('projectNameInput');
+  const instructionsInput = document.getElementById('projectInstructionsInput');
+  const editId = modal ? modal.getAttribute('data-edit-id') : null;
+
+  const name = nameInput.value.trim();
+  if (!name) return;
+
+  const activeDot = document.querySelector('#projectColorPicker .color-dot.active');
+  const color = activeDot ? activeDot.getAttribute('data-color') : '#c2410c';
+  const instructions = instructionsInput.value.trim();
+
+  if (editId) {
+    const proj = state.projects.find(p => p.id === editId);
+    if (proj) {
+      proj.name = name;
+      proj.color = color;
+      proj.instructions = instructions;
+      proj.updatedAt = new Date().toISOString();
+      showToast(`Updated project "${name}"`);
+    }
+  } else {
+    const newProj = {
+      id: 'proj_' + Date.now(),
+      name: name,
+      color: color,
+      icon: '📁',
+      instructions: instructions,
+      sources: [],
+      chats: [],
+      createdAt: new Date().toISOString()
+    };
+    state.projects.unshift(newProj);
+    showToast(`Created project "${name}"`);
+    openProjectWorkspace(newProj.id);
+  }
+
+  localStorage.setItem('oska_projects', JSON.stringify(state.projects));
+  renderProjectsSidebar();
+  closeProjectModal();
+};
+
+window.deleteProject = function(projectId) {
+  if (!confirm('Are you sure you want to delete this project?')) return;
+  state.projects = state.projects.filter(p => p.id !== projectId);
+  localStorage.setItem('oska_projects', JSON.stringify(state.projects));
+  if (state.activeProjectId === projectId) {
+    state.activeProjectId = null;
+    createNewConversation();
+  } else {
+    renderProjectsSidebar();
+  }
+  showToast('Project deleted');
+};
+
+function openProjectWorkspace(projectId) {
+  const proj = state.projects.find(p => p.id === projectId);
+  if (!proj) return;
+
+  state.activeProjectId = projectId;
+  renderProjectsSidebar();
+
+  // Switch to project screen view
+  document.getElementById('welcomeScreen').classList.add('hidden');
+  document.getElementById('conversationContainer').classList.add('hidden');
+  const screen = document.getElementById('projectScreen');
+  screen.classList.remove('hidden');
+
+  document.getElementById('headerChatTitle').textContent = proj.name;
+  document.getElementById('projectNameHeading').textContent = proj.name;
+  document.getElementById('projectMetaText').textContent = `Created ${new Date(proj.createdAt).toLocaleDateString()} · ${proj.sources.length} sources · ${proj.chats.length} chats`;
+
+  const instructionsDisplay = document.getElementById('projectInstructionsDisplay');
+  instructionsDisplay.textContent = proj.instructions || 'No custom instructions set. Chats in this project use standard mode.';
+
+  // Render project knowledge sources
+  const sourcesGrid = document.getElementById('projectSourcesGrid');
+  if (proj.sources.length === 0) {
+    sourcesGrid.innerHTML = `<div style="grid-column: 1/-1; padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.78rem;">No documents uploaded yet. Upload PDF, Word, Excel, or code files to share context across all chats in this project.</div>`;
+  } else {
+    sourcesGrid.innerHTML = proj.sources.map((s, idx) => `
+      <div class="project-source-card">
+        <div class="source-card-left" onclick="openFilePreviewByIdx('${escapeHtml(s.name)}', ${idx}, 'project')">
+          <i data-lucide="${getFileIconName(s.type)}" style="width: 15px; height: 15px; color: var(--accent-primary);"></i>
+          <div>
+            <div class="source-card-name">${escapeHtml(s.name)}</div>
+            <div style="font-size: 0.65rem; color: var(--text-muted);">${formatFileSize(s.size)}</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap: 4px;">
+          <button type="button" class="chat-action-btn" onclick="attachProjectSourceToChat(${idx})" title="Attach to Chat">
+            <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
+          </button>
+          <button type="button" class="chat-action-btn delete" onclick="removeProjectSource('${proj.id}', ${idx})" title="Remove Source">
+            <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Render project chats
+  const chatsList = document.getElementById('projectChatsList');
+  const projectChats = state.conversations.filter(c => c.projectId === proj.id);
+  if (projectChats.length === 0) {
+    chatsList.innerHTML = `<div style="padding: 0.8rem; text-align: center; color: var(--text-muted); font-size: 0.78rem;">No chats in this project yet. Click "+ New Chat" to start.</div>`;
+  } else {
+    chatsList.innerHTML = projectChats.map(c => `
+      <div class="project-chat-item" onclick="loadConversation('${c.id}')">
+        <div style="display:flex; align-items:center; gap: 0.5rem;">
+          <i data-lucide="message-square" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+          <span style="font-size: 0.82rem; font-weight: 500;">${escapeHtml(c.title || 'Project Chat')}</span>
+        </div>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">${c.messages.length} messages</span>
+      </div>
+    `).join('');
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function handleProjectFileUpload(e) {
+  if (!state.activeProjectId) return;
+  const proj = state.projects.find(p => p.id === state.activeProjectId);
+  if (!proj) return;
+
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  showToast(`Uploading ${files.length} file(s) to project knowledge...`);
+
+  for (const file of files) {
+    const parsed = await parseUploadedFile(file);
+    proj.sources.push(parsed);
+    // Also save to global user library
+    state.libraryFiles.push({
+      id: parsed.id,
+      name: parsed.name,
+      type: parsed.type,
+      size: parsed.size,
+      dataUrl: parsed.dataUrl || '',
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  localStorage.setItem('oska_projects', JSON.stringify(state.projects));
+  localStorage.setItem('oska_library', JSON.stringify(state.libraryFiles));
+  openProjectWorkspace(state.activeProjectId);
+  showToast('Project knowledge base updated');
+  e.target.value = '';
+}
+
+function startProjectChat(projectId) {
+  state.activeProjectId = projectId;
+  createNewConversation();
+  const conv = state.conversations.find(c => c.id === state.activeConversationId);
+  if (conv) {
+    conv.projectId = projectId;
+    saveConversationsToStorage();
+  }
+}
+
+window.removeProjectSource = function(projId, idx) {
+  const proj = state.projects.find(p => p.id === projId);
+  if (!proj) return;
+  proj.sources.splice(idx, 1);
+  localStorage.setItem('oska_projects', JSON.stringify(state.projects));
+  openProjectWorkspace(projId);
+  showToast('Source removed from project');
+};
+
+window.attachProjectSourceToChat = function(idx) {
+  if (!state.activeProjectId) return;
+  const proj = state.projects.find(p => p.id === state.activeProjectId);
+  if (!proj || !proj.sources[idx]) return;
+  state.attachments.push(proj.sources[idx]);
+  renderAttachmentBar();
+  showToast(`Attached ${proj.sources[idx].name} to composer`);
+};
+
+// -------------------------------------------------------------
+// 15d. File Library (My Files)
+// -------------------------------------------------------------
+function openLibraryModal() {
+  const modal = document.getElementById('libraryModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  renderLibraryGrid('all');
+}
+
+function closeLibraryModal() {
+  const modal = document.getElementById('libraryModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function renderLibraryGrid(filter) {
+  const grid = document.getElementById('libraryGrid');
+  if (!grid) return;
+
+  let files = state.libraryFiles || [];
+  if (filter && filter !== 'all') {
+    files = files.filter(f => f.type === filter);
+  }
+
+  if (files.length === 0) {
+    grid.innerHTML = `<div style="grid-column: 1/-1; padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No files found in this category</div>`;
+    return;
+  }
+
+  grid.innerHTML = files.map((f, idx) => `
+    <div class="library-file-card">
+      <div class="library-card-top">
+        <i data-lucide="${getFileIconName(f.type)}" style="width: 20px; height: 20px; color: var(--accent-primary); flex-shrink: 0;"></i>
+        <div style="min-width: 0;">
+          <div class="library-card-title" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+          <div class="library-card-meta">${(f.type || 'file').toUpperCase()} · ${formatFileSize(f.size)}</div>
+        </div>
+      </div>
+      <div class="library-card-actions">
+        <button type="button" class="preview-action-btn" onclick="openFilePreview(${JSON.stringify(f).replace(/"/g, '&quot;')})">
+          <i data-lucide="eye" style="width: 12px; height: 12px;"></i> Preview
+        </button>
+        <button type="button" class="preview-action-btn" onclick="addLibraryFileToChat('${f.id}')">
+          <i data-lucide="plus" style="width: 12px; height: 12px;"></i> Attach
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function addLibraryFileToChat(fileId) {
+  const file = state.libraryFiles.find(f => f.id === fileId);
+  if (!file) return;
+  state.attachments.push(file);
+  renderAttachmentBar();
+  closeLibraryModal();
+  showToast(`Added ${file.name} to chat`);
+}
+
+window.openFilePreviewByIdx = function(name, idx, context) {
+  if (context === 'project' && state.activeProjectId) {
+    const proj = state.projects.find(p => p.id === state.activeProjectId);
+    if (proj && proj.sources[idx]) {
+      openFilePreview(proj.sources[idx]);
+      return;
+    }
+  }
+
+  const att = state.attachments.find(a => a.name === name) || state.attachments[idx];
+  if (att) {
+    openFilePreview(att);
+  } else {
+    const activeConv = state.conversations.find(c => c.id === state.activeConversationId);
+    if (activeConv) {
+      for (const msg of activeConv.messages) {
+        if (msg.attachments && Array.isArray(msg.attachments)) {
+          const found = msg.attachments.find(a => (typeof a === 'string' ? a === name : a.name === name));
+          if (found) {
+            openFilePreview(typeof found === 'object' ? found : { name: found, type: 'document' });
+            return;
+          }
+        }
+      }
+    }
+    openFilePreview({ name: name, type: 'document', textContext: 'Attached file context.' });
+  }
+};
+
+// -------------------------------------------------------------
 // 16. Conversation Management & Rendering
 // -------------------------------------------------------------
 function createNewConversation() {
@@ -1167,7 +2007,7 @@ function loadConversation(convId) {
   container.innerHTML = '';
 
   conv.messages.forEach(msg => {
-    appendMessageToDOM(msg.role, msg.content, msg.reasoning, msg.media, msg.citations, msg.chart);
+    appendMessageToDOM(msg.role, msg.content, msg.reasoning, msg.media, msg.citations, msg.chart, null, msg.attachments);
   });
 
   renderConversationsList();
@@ -1243,10 +2083,25 @@ async function handleSendMessage() {
   }
 
   // Render User Message
-  conv.messages.push({ role: 'user', content: prompt, attachments: currentAttachments.map(a => a.name) });
-  appendMessageToDOM('user', prompt, null, null, null, null);
+  conv.messages.push({ role: 'user', content: prompt, attachments: currentAttachments });
+  appendMessageToDOM('user', prompt, null, null, null, null, null, currentAttachments);
   saveConversationsToStorage();
   renderConversationsList();
+
+  // Save attached files to user library
+  currentAttachments.forEach(att => {
+    if (!state.libraryFiles.some(f => f.name === att.name && f.size === att.size)) {
+      state.libraryFiles.push({
+        id: att.id || 'lib_' + Date.now(),
+        name: att.name,
+        type: att.type,
+        size: att.size || 0,
+        dataUrl: att.dataUrl || '',
+        createdAt: new Date().toISOString()
+      });
+    }
+  });
+  localStorage.setItem('oska_library', JSON.stringify(state.libraryFiles));
 
   // Create Assistant Message Placeholder with thinking indicator
   const assistantBubbleId = 'msg_' + Date.now();
@@ -1282,6 +2137,11 @@ async function handleSendMessage() {
 
   // Multilingual System Prompt Preparation
   const systemPrompt = buildLanguageSystemPrompt(prompt, state.responseLanguage);
+
+  // Active Project Context
+  const activeProj = state.projects.find(p => p.id === conv.projectId || p.id === state.activeProjectId);
+  const projectInstructions = activeProj ? activeProj.instructions : '';
+  const projectSources = activeProj ? activeProj.sources : [];
 
   // API Streaming Request with 35s timeout
   state.abortController = new AbortController();
@@ -1322,6 +2182,10 @@ async function handleSendMessage() {
         messages: messagesPayload,
         model: state.selectedModel,
         reasoningEffort: state.reasoningEffort,
+        mode: state.selectedMode,
+        customModeInstructions: state.customModeInstructions,
+        projectInstructions: projectInstructions,
+        projectSources: projectSources,
         inlineImage: inlineImage,
         tool: state.activeTool,
         stream: true
@@ -1762,13 +2626,27 @@ function renderSourceCards(citations) {
   `;
 }
 
-function appendMessageToDOM(role, content, reasoning, media, citations, chart, rowId) {
+function appendMessageToDOM(role, content, reasoning, media, citations, chart, rowId, attachments) {
   const container = document.getElementById('conversationContainer');
   const row = document.createElement('div');
   row.className = `message-row ${role}`;
   if (rowId) row.id = rowId;
 
   let renderedHTML = '';
+
+  if (role === 'user' && attachments && attachments.length > 0) {
+    renderedHTML += `
+      <div class="chat-attachments-row">
+        ${attachments.map((att, idx) => `
+          <div class="chat-file-chip" onclick="openFilePreviewByIdx('${escapeHtml(typeof att === 'string' ? att : att.name)}', ${idx})" title="Click to preview ${escapeHtml(typeof att === 'string' ? att : att.name)}">
+            <i data-lucide="${getFileIconName(typeof att === 'object' ? att.type : 'document')}" class="chip-icon" style="width: 14px; height: 14px;"></i>
+            <span class="chip-name">${escapeHtml(typeof att === 'string' ? att : att.name)}</span>
+            <span class="chip-type-tag">${escapeHtml(typeof att === 'object' ? (att.type || 'file') : 'file')}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
 
   if (reasoning) {
     renderedHTML += `

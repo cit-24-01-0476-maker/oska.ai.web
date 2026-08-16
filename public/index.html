@@ -65,6 +65,19 @@
         </div>
       </div>
 
+      <!-- Projects Section -->
+      <div class="sidebar-section-container">
+        <div class="sidebar-section-header">
+          <span>PROJECTS</span>
+          <button type="button" class="sidebar-section-btn" id="sidebarNewProjectBtn" title="Create new project" aria-label="New Project">
+            <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
+          </button>
+        </div>
+        <div class="sidebar-projects-list" id="sidebarProjectsList">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
       <!-- Grouped Conversation History -->
       <div class="sidebar-history" id="sidebarHistory" role="navigation" aria-label="Chat History">
         <!-- Dynamically rendered based on auth state -->
@@ -85,6 +98,9 @@
         </button>
 
         <div class="sidebar-quick-tools">
+          <button type="button" class="footer-btn" id="openLibraryBtn" title="File Library (My Files)" aria-label="File Library">
+            <i data-lucide="folder-open" style="width: 16px; height: 16px;"></i>
+          </button>
           <button type="button" class="footer-btn" id="openSettingsBtn" title="Settings" aria-label="Settings">
             <i data-lucide="settings" style="width: 16px; height: 16px;"></i>
           </button>
@@ -200,6 +216,69 @@
           </div>
         </div>
 
+        <!-- Project Workspace Screen -->
+        <div class="project-screen hidden" id="projectScreen">
+          <div class="project-header-card">
+            <div class="project-header-top">
+              <div class="project-title-row">
+                <div class="project-icon-badge" id="projectIconBadge">📁</div>
+                <div>
+                  <h1 class="project-name-heading" id="projectNameHeading">Project Name</h1>
+                  <p class="project-meta-text" id="projectMetaText">Created recently · 0 files · 0 chats</p>
+                </div>
+              </div>
+              <div class="project-actions-row">
+                <button type="button" class="dialog-btn secondary" id="projectSettingsBtn" title="Project Instructions">
+                  <i data-lucide="sparkles" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+                  <span>Instructions</span>
+                </button>
+                <button type="button" class="dialog-btn primary" id="projectNewChatBtn" title="New Project Chat">
+                  <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+                  <span>New Chat</span>
+                </button>
+              </div>
+            </div>
+            <div class="project-instructions-box" id="projectInstructionsBox">
+              <div class="instructions-label"><i data-lucide="sparkles" style="width: 13px; height: 13px;"></i> Project System Instructions:</div>
+              <div class="instructions-content" id="projectInstructionsDisplay">No custom instructions set. Chats in this project use standard mode.</div>
+            </div>
+          </div>
+
+          <!-- Project Knowledge / Sources Section -->
+          <div class="project-section-card">
+            <div class="project-section-header">
+              <div class="section-title-left">
+                <i data-lucide="book-marked" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+                <h2>Project Knowledge & Sources</h2>
+              </div>
+              <div>
+                <input type="file" id="projectFileInput" multiple style="display: none;" accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.pptx,.txt,.json,.js,.ts,.py,.java,.cpp,.html,.css,.md">
+                <button type="button" class="dialog-btn secondary" id="projectUploadFileBtn">
+                  <i data-lucide="upload" style="width: 14px; height: 14px;"></i>
+                  <span>Upload Sources</span>
+                </button>
+              </div>
+            </div>
+            <p class="section-desc">Documents uploaded here are automatically included as persistent context in all chats within this project.</p>
+            <div class="project-sources-grid" id="projectSourcesGrid">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Project Chats Section -->
+          <div class="project-section-card">
+            <div class="project-section-header">
+              <div class="section-title-left">
+                <i data-lucide="messages-square" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+                <h2>Project Conversations</h2>
+              </div>
+            </div>
+            <div class="project-chats-list" id="projectChatsList">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
         <!-- Dynamic Conversation Stream -->
         <div class="conversation-container hidden" id="conversationContainer"></div>
       </div>
@@ -220,6 +299,15 @@
           <div class="popover-header">REASONING EFFORT</div>
           <div class="popover-scroll-list" id="effortPopoverList">
             <!-- Dynamically rendered -->
+          </div>
+        </div>
+
+        <!-- Behavior Mode Popover -->
+        <div class="composer-popover hidden" id="composerModePopover" role="menu" aria-label="Select Behavior Mode">
+          <div class="popover-sheet-handle hidden"></div>
+          <div class="popover-header">BEHAVIOR MODE</div>
+          <div class="popover-scroll-list" id="modePopoverList">
+            <!-- Dynamically rendered (Auto, General, Direct, Coder, Academic, Research, Data Analyst, Creative, Custom) -->
           </div>
         </div>
 
@@ -363,6 +451,12 @@
             </div>
 
             <div class="composer-actions-right">
+              <!-- Interactive Behavior Mode Selector Button -->
+              <button type="button" class="composer-control-pill" id="composerModeBtn" title="Select Behavior Mode" aria-haspopup="true" aria-expanded="false" aria-label="Select Behavior Mode">
+                <span class="control-label" id="composerModeLabel">Auto</span>
+                <i data-lucide="chevron-down" style="width: 13px; height: 13px;" class="chevron-icon"></i>
+              </button>
+
               <!-- Interactive Model Selector Button -->
               <button type="button" class="composer-control-pill" id="composerModelBtn" title="Select AI Model" aria-haspopup="true" aria-expanded="false" aria-label="Select AI Model">
                 <span class="control-label" id="composerModelLabel">Gemini 3.7 Flash</span>
@@ -554,6 +648,107 @@
         </div>
         <div class="dialog-footer">
           <button type="button" class="btn-primary" id="saveSettingsBtn">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Universal File Preview Modal -->
+    <div class="modal-overlay hidden" id="filePreviewModal" role="dialog" aria-modal="true" aria-labelledby="filePreviewTitle">
+      <div class="file-preview-card">
+        <div class="preview-header">
+          <div class="preview-header-left">
+            <i data-lucide="file-text" id="previewFileIcon" style="width: 18px; height: 18px; color: var(--accent-primary);"></i>
+            <div>
+              <div class="preview-title" id="filePreviewTitle">Document Preview</div>
+              <div class="preview-subtitle" id="filePreviewSubtitle">PDF · 3 pages · 245 KB</div>
+            </div>
+          </div>
+          <div class="preview-header-actions">
+            <a href="#" class="preview-action-btn" id="previewDownloadBtn" download title="Download Original File">
+              <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+              <span>Download</span>
+            </a>
+            <button type="button" class="preview-action-btn" id="previewAttachChatBtn" title="Attach to Active Chat">
+              <i data-lucide="paperclip" style="width: 14px; height: 14px;"></i>
+              <span>Attach</span>
+            </button>
+            <button type="button" class="icon-btn" id="closeFilePreviewBtn" aria-label="Close Preview">
+              <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+            </button>
+          </div>
+        </div>
+        <div class="preview-body" id="filePreviewBody">
+          <!-- Dynamically rendered content (PDF reader, DOCX, PPTX slides, Spreadsheet table, Code viewer, Image) -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Create / Edit Project Modal -->
+    <div class="modal-overlay hidden" id="projectModal" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+      <div class="settings-dialog project-dialog">
+        <div class="dialog-header">
+          <h2 class="dialog-title" id="projectModalTitle">New Project</h2>
+          <button type="button" class="icon-btn" id="closeProjectModalBtn" aria-label="Close">
+            <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+          </button>
+        </div>
+        <div class="dialog-body">
+          <form id="projectForm" onsubmit="event.preventDefault(); saveProject();">
+            <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 0.4rem;">
+              <label class="setting-label" for="projectNameInput">Project Name</label>
+              <input type="text" id="projectNameInput" class="setting-text-input" placeholder="e.g. MSc AI Research, Q3 Marketing, Next.js Web App" required>
+            </div>
+            <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 0.4rem;">
+              <label class="setting-label">Accent Color & Theme</label>
+              <div class="project-color-picker" id="projectColorPicker">
+                <button type="button" class="color-dot active" data-color="#c2410c" style="background-color: #c2410c;"></button>
+                <button type="button" class="color-dot" data-color="#2563eb" style="background-color: #2563eb;"></button>
+                <button type="button" class="color-dot" data-color="#059669" style="background-color: #059669;"></button>
+                <button type="button" class="color-dot" data-color="#7c3aed" style="background-color: #7c3aed;"></button>
+                <button type="button" class="color-dot" data-color="#db2777" style="background-color: #db2777;"></button>
+                <button type="button" class="color-dot" data-color="#d97706" style="background-color: #d97706;"></button>
+              </div>
+            </div>
+            <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 0.4rem;">
+              <label class="setting-label" for="projectInstructionsInput">Project System Instructions (Optional)</label>
+              <p class="setting-desc">Instructions applied to all chats inside this project (e.g. tone, terminology, context).</p>
+              <textarea id="projectInstructionsInput" class="setting-textarea" rows="4" placeholder="e.g. This project is for my MSc AI thesis. Prefer academic, structured explanations with APA terminology."></textarea>
+            </div>
+            <div class="dialog-footer">
+              <button type="button" class="dialog-btn secondary" id="cancelProjectBtn">Cancel</button>
+              <button type="submit" class="dialog-btn primary" id="saveProjectBtn">Create Project</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- File Library Modal (My Files) -->
+    <div class="modal-overlay hidden" id="libraryModal" role="dialog" aria-modal="true" aria-labelledby="libraryModalTitle">
+      <div class="settings-dialog library-dialog">
+        <div class="dialog-header">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="folder-open" style="color: var(--accent-primary);"></i>
+            <h2 class="dialog-title" id="libraryModalTitle">File Library (My Files)</h2>
+          </div>
+          <button type="button" class="icon-btn" id="closeLibraryBtn" aria-label="Close Library">
+            <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+          </button>
+        </div>
+        <div class="dialog-body">
+          <!-- Library Category Tabs -->
+          <div class="library-filter-tabs" id="libraryFilterTabs">
+            <button type="button" class="library-tab active" data-filter="all">All Files</button>
+            <button type="button" class="library-tab" data-filter="document">Documents</button>
+            <button type="button" class="library-tab" data-filter="spreadsheet">Spreadsheets</button>
+            <button type="button" class="library-tab" data-filter="presentation">Presentations</button>
+            <button type="button" class="library-tab" data-filter="image">Images</button>
+            <button type="button" class="library-tab" data-filter="code">Code</button>
+          </div>
+
+          <div class="library-grid" id="libraryGrid">
+            <!-- Dynamically rendered library cards -->
+          </div>
         </div>
       </div>
     </div>
