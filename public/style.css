@@ -371,17 +371,87 @@ button, input, textarea, select {
   background-color: var(--bg-surface-active);
 }
 
-.chat-action-btn.delete:hover {
-  color: #ef4444;
-}
-
-/* Sidebar Footer */
+/* Sidebar Footer & User Profile */
 .sidebar-footer {
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 0.8rem;
   border-top: 1px solid var(--border-subtle);
   display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.user-profile-btn {
+  display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.user-profile-btn:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-subtle);
+}
+
+.avatar-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar-circle img, .avatar-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-info-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.user-display-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-email-text {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-quick-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  padding-top: 0.2rem;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .footer-btn {
@@ -389,10 +459,11 @@ button, input, textarea, select {
   border: none;
   color: var(--text-secondary);
   font-size: 0.84rem;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -401,6 +472,40 @@ button, input, textarea, select {
 .footer-btn:hover {
   background-color: var(--bg-surface-hover);
   color: var(--text-primary);
+}
+
+.account-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem 0.8rem;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 0.3rem;
+}
+
+.avatar-large {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.menu-user-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.menu-user-email {
+  font-size: 0.74rem;
+  color: var(--text-muted);
 }
 
 /* -------------------------------------------------------------
@@ -1492,11 +1597,213 @@ button, input, textarea, select {
   padding: 0.45rem 1rem;
   font-size: 0.85rem;
   cursor: pointer;
+/* -------------------------------------------------------------
+   Google Sign-In & Auth Modal
+   ------------------------------------------------------------- */
+.auth-dialog {
+  max-width: 420px;
+  text-align: center;
+  padding: 2rem 1.5rem;
 }
 
-.btn-secondary:hover {
-  background-color: var(--bg-surface-hover);
+.auth-dialog-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.auth-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 1.4rem;
+  margin-bottom: 0.8rem;
+}
+
+.auth-title {
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.auth-subtitle {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.auth-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.google-signin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.google-signin-btn:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: 0.4rem 0;
+}
+
+.auth-divider::before, .auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.auth-divider span {
+  padding: 0 0.5rem;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* -------------------------------------------------------------
+   Admin Console Dashboard
+   ------------------------------------------------------------- */
+.admin-dialog {
+  max-width: 720px;
+}
+
+.admin-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
+  margin-bottom: 1.2rem;
+}
+
+.metric-card {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.metric-val {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.metric-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.admin-section-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.6rem;
+}
+
+.admin-provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.admin-provider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+}
+
+.provider-status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.provider-status.online {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+/* -------------------------------------------------------------
+   Interactive Data Chart Card & Citations
+   ------------------------------------------------------------- */
+.ai-chart-card {
+  margin: 1.2rem 0;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  max-width: 600px;
+  box-shadow: var(--shadow-sm);
+}
+
+.ai-chart-header {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.chart-canvas-wrapper {
+  position: relative;
+  height: 260px;
+  width: 100%;
+}
+
+.citation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background-color: var(--bg-surface-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 1px 5px;
+  font-size: 0.72rem;
+  color: var(--accent-primary);
+  font-weight: 600;
+  margin: 0 2px;
+  text-decoration: none;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.citation-chip:hover {
+  background-color: var(--accent-soft);
 }
 
 /* -------------------------------------------------------------

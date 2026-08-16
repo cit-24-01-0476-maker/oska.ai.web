@@ -4,18 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>oska.AI V1</title>
-  <meta name="description" content="oska.AI V1 — Production-grade multi-model conversational AI platform.">
+  <meta name="description" content="oska.AI V1 — Production-grade multi-model conversational AI workspace.">
   
   <!-- Typography & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Sinhala:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Highlight.js & Marked -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Document & Media Intelligence SDKs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase Authentication SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -52,20 +62,31 @@
         </div>
       </div>
 
-      <!-- Grouped Conversation History (Pinned, Today, Yesterday, Previous 7 days, Older) -->
+      <!-- Grouped Conversation History -->
       <div class="sidebar-history" id="sidebarHistory" role="navigation" aria-label="Chat History">
         <!-- Dynamically rendered -->
       </div>
 
-      <!-- Sidebar Footer -->
+      <!-- Sidebar Footer / Account Menu -->
       <div class="sidebar-footer">
-        <button type="button" class="footer-btn" id="openSettingsBtn" aria-label="Settings">
-          <i data-lucide="settings" style="width: 16px; height: 16px;"></i>
-          <span>Settings</span>
+        <!-- User Profile Pill -->
+        <button type="button" class="user-profile-btn" id="userProfileBtn" aria-label="User Account">
+          <div class="avatar-circle" id="userAvatar">U</div>
+          <div class="user-info-text">
+            <span class="user-display-name" id="userDisplayName">Guest User</span>
+            <span class="user-email-text" id="userEmailText">Sign in to save cloud sync</span>
+          </div>
+          <i data-lucide="more-vertical" style="width: 14px; height: 14px;"></i>
         </button>
-        <button type="button" class="footer-btn" id="themeToggleBtn" title="Toggle theme" aria-label="Toggle theme">
-          <i data-lucide="moon" style="width: 16px; height: 16px;" id="themeIcon"></i>
-        </button>
+
+        <div class="sidebar-quick-tools">
+          <button type="button" class="footer-btn" id="openSettingsBtn" title="Settings" aria-label="Settings">
+            <i data-lucide="settings" style="width: 16px; height: 16px;"></i>
+          </button>
+          <button type="button" class="footer-btn" id="themeToggleBtn" title="Toggle theme" aria-label="Toggle theme">
+            <i data-lucide="moon" style="width: 16px; height: 16px;" id="themeIcon"></i>
+          </button>
+        </div>
       </div>
     </aside>
 
@@ -107,24 +128,24 @@
         <div class="welcome-screen" id="welcomeScreen">
           <div class="welcome-mark">O</div>
           <h1 class="welcome-greeting" id="welcomeGreeting">What would you like to explore today?</h1>
-          <p class="welcome-subtext">Ask questions, write code, analyze files, or create with oska.AI.</p>
+          <p class="welcome-subtext">Ask questions, analyze files, spreadsheets, images, search the web, or create with oska.AI.</p>
 
           <div class="welcome-shortcuts">
-            <button type="button" class="shortcut-chip" data-prompt="Draft a clean REST API in Node.js with error handling">
+            <button type="button" class="shortcut-chip" data-prompt="Build a clean Node.js REST API with input validation and error handling">
               <i data-lucide="code" style="width: 14px; height: 14px;"></i>
               <span>Build an API</span>
             </button>
-            <button type="button" class="shortcut-chip" data-prompt="Explain how transformer attention mechanisms work mathematically">
+            <button type="button" class="shortcut-chip" data-prompt="Explain how transformer self-attention works mathematically step by step">
               <i data-lucide="brain" style="width: 14px; height: 14px;"></i>
               <span>Explain Concept</span>
             </button>
-            <button type="button" class="shortcut-chip" data-prompt="Help me brainstorm 5 unique product concepts for AI automation">
+            <button type="button" class="shortcut-chip" data-prompt="Help me brainstorm 5 unique AI workflow product ideas">
               <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
               <span>Brainstorm Ideas</span>
             </button>
-            <button type="button" class="shortcut-chip" data-prompt="Analyze this code and suggest performance optimizations:">
-              <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
-              <span>Debug & Optimize</span>
+            <button type="button" class="shortcut-chip" data-prompt="mata me python code eka explain karanna puluwanda">
+              <i data-lucide="languages" style="width: 14px; height: 14px;"></i>
+              <span>Singlish / සිංහල</span>
             </button>
           </div>
         </div>
@@ -151,8 +172,8 @@
           <div class="composer-toolbar">
             <div class="composer-tools-left">
               <!-- File Attachment Button -->
-              <input type="file" id="fileInput" multiple style="display: none;">
-              <button type="button" class="composer-btn" id="attachBtn" title="Attach files or images" aria-label="Attach files">
+              <input type="file" id="fileInput" multiple style="display: none;" accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.txt,.json,.js,.ts,.tsx,.py,.java,.cpp,.html,.css,.md">
+              <button type="button" class="composer-btn" id="attachBtn" title="Attach files, PDFs, spreadsheets, or images" aria-label="Attach files">
                 <i data-lucide="paperclip" style="width: 15px; height: 15px;"></i>
                 <span class="btn-label-desktop">Attach</span>
               </button>
@@ -161,6 +182,12 @@
               <button type="button" class="composer-btn" id="toolsMenuBtn" title="Workspace Tools" aria-label="Tools">
                 <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
                 <span class="btn-label-desktop">Tools</span>
+              </button>
+
+              <!-- Language Quick Selector -->
+              <button type="button" class="composer-btn" id="composerLangBtn" title="Response Language" aria-label="Language">
+                <i data-lucide="languages" style="width: 15px; height: 15px;"></i>
+                <span class="btn-label-desktop" id="composerLangLabel">Auto</span>
               </button>
             </div>
 
@@ -187,14 +214,14 @@
             </div>
           </div>
         </div>
-        <div class="composer-disclaimer">oska.AI may generate inaccurate information. Verify critical details.</div>
+        <div class="composer-disclaimer">oska.AI may generate inaccurate information. Verify critical facts.</div>
       </div>
     </main>
 
     <!-- Generic Popover Backdrop for Mobile / Outside-Click -->
     <div class="popover-backdrop hidden" id="popoverBackdrop"></div>
 
-    <!-- Direct Model Picker Popover (Opens Directly Above Model Button) -->
+    <!-- Direct Model Picker Popover -->
     <div class="composer-popover hidden" id="composerModelPopover" role="menu" aria-label="Select AI Model">
       <div class="popover-header">AI MODELS</div>
       <div class="popover-scroll-list" id="modelPopoverList">
@@ -202,7 +229,7 @@
       </div>
     </div>
 
-    <!-- Direct Reasoning Effort Popover (Opens Directly Above Reasoning Button) -->
+    <!-- Direct Reasoning Effort Popover -->
     <div class="composer-popover hidden" id="composerEffortPopover" role="menu" aria-label="Select Reasoning Effort">
       <div class="popover-header">REASONING EFFORT</div>
       <div class="popover-scroll-list" id="effortPopoverList">
@@ -210,7 +237,7 @@
       </div>
     </div>
 
-    <!-- Tools Menu Popover (Opens Upward from Composer Tools Button) -->
+    <!-- Tools Menu Popover -->
     <div class="composer-popover hidden" id="toolsPopover" role="menu" aria-label="Workspace Tools">
       <div class="popover-header">WORKSPACE TOOLS</div>
       <div class="popover-scroll-list">
@@ -219,7 +246,25 @@
             <i data-lucide="globe" style="width: 15px; height: 15px;"></i>
             <div>
               <div class="item-title">Web Search</div>
-              <div class="item-desc">Search real-time web intelligence</div>
+              <div class="item-desc">Live search with real source citations</div>
+            </div>
+          </div>
+        </button>
+        <button type="button" class="popover-item" id="toolResearchBtn">
+          <div class="popover-item-left">
+            <i data-lucide="book-open-check" style="width: 15px; height: 15px;"></i>
+            <div>
+              <div class="item-title">Deep Research</div>
+              <div class="item-desc">Multi-source structured investigation</div>
+            </div>
+          </div>
+        </button>
+        <button type="button" class="popover-item" id="toolDataAnalysisBtn">
+          <div class="popover-item-left">
+            <i data-lucide="line-chart" style="width: 15px; height: 15px;"></i>
+            <div>
+              <div class="item-title">Data & Chart Analysis</div>
+              <div class="item-desc">Interactive stats and visualization</div>
             </div>
           </div>
         </button>
@@ -241,6 +286,164 @@
             </div>
           </div>
         </button>
+      </div>
+    </div>
+
+    <!-- Language Selector Popover -->
+    <div class="composer-popover hidden" id="languagePopover" role="menu" aria-label="Response Language">
+      <div class="popover-header">RESPONSE LANGUAGE</div>
+      <div class="popover-scroll-list" id="languagePopoverList">
+        <button type="button" class="popover-item active" data-lang="auto">
+          <div class="popover-item-left">
+            <div>
+              <div class="item-title">Auto Detect (Default)</div>
+              <div class="item-desc">Matches English, Sinhala Unicode, or Singlish</div>
+            </div>
+          </div>
+          <span class="check-icon">✓</span>
+        </button>
+        <button type="button" class="popover-item" data-lang="english">
+          <div class="popover-item-left">
+            <div>
+              <div class="item-title">English</div>
+              <div class="item-desc">Standard fluent English</div>
+            </div>
+          </div>
+          <span class="check-icon">✓</span>
+        </button>
+        <button type="button" class="popover-item" data-lang="sinhala">
+          <div class="popover-item-left">
+            <div>
+              <div class="item-title">සිංහල (Sinhala)</div>
+              <div class="item-desc">ස්වභාවික සිංහල භාෂාවෙන් පිළිතුරු</div>
+            </div>
+          </div>
+          <span class="check-icon">✓</span>
+        </button>
+        <button type="button" class="popover-item" data-lang="singlish">
+          <div class="popover-item-left">
+            <div>
+              <div class="item-title">Singlish</div>
+              <div class="item-desc">Romanized Sinhala (mata meka explain krnn)</div>
+            </div>
+          </div>
+          <span class="check-icon">✓</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Account & User Popover -->
+    <div class="composer-popover hidden" id="accountPopover" role="menu" aria-label="Account Menu">
+      <div class="popover-header">MY ACCOUNT</div>
+      <div class="popover-scroll-list">
+        <div class="account-profile-header">
+          <div class="avatar-large" id="menuUserAvatar">U</div>
+          <div>
+            <div class="menu-user-name" id="menuUserName">Guest User</div>
+            <div class="menu-user-email" id="menuUserEmail">guest@oska.ai</div>
+          </div>
+        </div>
+        <button type="button" class="popover-item" id="menuAdminBtn" style="display: none;">
+          <div class="popover-item-left">
+            <i data-lucide="shield-check" style="width: 15px; height: 15px; color: var(--accent-primary);"></i>
+            <span>Admin Console</span>
+          </div>
+        </button>
+        <button type="button" class="popover-item" id="menuLoginBtn">
+          <div class="popover-item-left">
+            <i data-lucide="log-in" style="width: 15px; height: 15px;"></i>
+            <span>Sign in with Google</span>
+          </div>
+        </button>
+        <button type="button" class="popover-item hidden" id="menuSignOutBtn">
+          <div class="popover-item-left">
+            <i data-lucide="log-out" style="width: 15px; height: 15px; color: #ef4444;"></i>
+            <span style="color: #ef4444;">Sign Out</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Google Sign-In / Login Modal -->
+    <div class="modal-overlay hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+      <div class="settings-dialog auth-dialog">
+        <div class="auth-dialog-header">
+          <div class="brand-icon auth-icon">O</div>
+          <h2 class="auth-title" id="loginModalTitle">Welcome to oska.AI</h2>
+          <p class="auth-subtitle">Sign in to unlock cloud conversation sync, document intelligence, and multi-model access.</p>
+        </div>
+        <div class="auth-dialog-body">
+          <button type="button" class="google-signin-btn" id="googleSignInBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+          <div class="auth-divider"><span>or</span></div>
+          <button type="button" class="btn-secondary full-width" id="guestContinueBtn">Continue as Guest</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Panel Modal -->
+    <div class="modal-overlay hidden" id="adminModal" role="dialog" aria-modal="true" aria-labelledby="adminDialogTitle">
+      <div class="settings-dialog admin-dialog">
+        <div class="dialog-header">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="shield-check" style="color: var(--accent-primary);"></i>
+            <h2 class="dialog-title" id="adminDialogTitle">oska.AI Admin Console</h2>
+          </div>
+          <button type="button" class="icon-btn" id="closeAdminBtn" aria-label="Close Admin">
+            <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+          </button>
+        </div>
+        <div class="dialog-body">
+          <div class="admin-metrics-grid">
+            <div class="metric-card">
+              <div class="metric-val" id="metricTotalChats">0</div>
+              <div class="metric-label">Active Chats</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val" id="metricActiveProvider">5/5</div>
+              <div class="metric-label">Providers Online</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val" id="metricAuthStatus">Active</div>
+              <div class="metric-label">Firebase Auth</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val" id="metricAppVersion">V1.0</div>
+              <div class="metric-label">Platform Release</div>
+            </div>
+          </div>
+
+          <h3 class="admin-section-title">Connected AI Provider Gateway</h3>
+          <div class="admin-provider-list" id="adminProviderList">
+            <div class="admin-provider-row">
+              <span class="provider-name">Google Gemini (3.7 / 3.5 Flash)</span>
+              <span class="provider-status online">Available</span>
+            </div>
+            <div class="admin-provider-row">
+              <span class="provider-name">OpenAI (GPT-4o / GPT-4o-mini)</span>
+              <span class="provider-status online">Available</span>
+            </div>
+            <div class="admin-provider-row">
+              <span class="provider-name">Groq LPU (Llama 3.3 70B & Qwen)</span>
+              <span class="provider-status online">Available</span>
+            </div>
+            <div class="admin-provider-row">
+              <span class="provider-name">OpenRouter Universal Hub</span>
+              <span class="provider-status online">Available</span>
+            </div>
+            <div class="admin-provider-row">
+              <span class="provider-name">DeepSeek R1 Reasoner</span>
+              <span class="provider-status online">Available</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -267,14 +470,29 @@
 
           <div class="setting-row">
             <div>
+              <div class="setting-label">Response Language</div>
+              <div class="setting-desc">Automatic, English, Sinhala, or Singlish</div>
+            </div>
+            <select class="setting-select" id="settingLanguageSelect">
+              <option value="auto">Auto (English / සිංහල / Singlish)</option>
+              <option value="english">English</option>
+              <option value="sinhala">සිංහල (Sinhala)</option>
+              <option value="singlish">Singlish (Romanized)</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div>
               <div class="setting-label">Default Model</div>
               <div class="setting-desc">Model used for new conversations</div>
             </div>
             <select class="setting-select" id="defaultModelSelect">
               <option value="gemini-3.7-flash">Gemini 3.7 Flash (Google)</option>
+              <option value="gpt-4o">GPT-4o (OpenAI)</option>
               <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Groq LPU)</option>
               <option value="qwen/qwen3.6-27b">Qwen 3.6 Reasoner (Groq)</option>
               <option value="openrouter/free">OpenRouter Auto Hub</option>
+              <option value="deepseek-reasoner">DeepSeek R1</option>
             </select>
           </div>
 
@@ -297,7 +515,7 @@
           <div class="setting-row" style="border-top: 1px solid var(--border-subtle); padding-top: 1rem;">
             <div>
               <div class="setting-label">About oska.AI</div>
-              <div class="setting-desc">Version 1.0 (Production Multi-Model Release)</div>
+              <div class="setting-desc">Version 1.0 (ChatGPT-Grade Multi-Model Workspace)</div>
             </div>
             <span class="brand-badge">V1</span>
           </div>

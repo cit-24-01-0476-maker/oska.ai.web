@@ -1,9 +1,38 @@
 /**
- * oska.AI V1 — Production Client Architecture
- * Direct Interactive Composer Model & Reasoning Controls
+ * oska.AI V1 — Complete Production AI Platform Client
+ * ChatGPT-Grade Multi-Model Workspace with Firebase Auth,
+ * Universal Document/Data Analysis, Real Web Search, & Multilingual Intelligence
  */
 
-// Model Registry
+// -------------------------------------------------------------
+// 1. Firebase Authentication Setup
+// -------------------------------------------------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyAynMj77uns1Qcqn8OWNWpGAkOGvjQyIKE",
+  authDomain: "web-ai-5a12f.firebaseapp.com",
+  projectId: "web-ai-5a12f",
+  storageBucket: "web-ai-5a12f.firebasestorage.app",
+  messagingSenderId: "698188933837",
+  appId: "1:698188933837:web:7685dd8bb46fba22ec1784"
+};
+
+let auth = null;
+let currentUser = null;
+
+if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    auth = firebase.auth();
+  } catch (err) {
+    console.warn('Firebase initialization notice:', err);
+  }
+}
+
+// -------------------------------------------------------------
+// 2. Centralized Model & Reasoning Catalog
+// -------------------------------------------------------------
 const DEFAULT_MODELS = [
   {
     id: 'gemini-3.7-flash',
@@ -11,7 +40,7 @@ const DEFAULT_MODELS = [
     name: 'Gemini 3.7 Flash',
     tag: 'Google · Vision · Reasoning',
     badge: 'Recommended',
-    capabilities: { vision: true, reasoning: true, streaming: true },
+    capabilities: { vision: true, files: true, reasoning: true, streaming: true },
     supportedEfforts: ['instant', 'medium', 'high', 'extra-high', 'pro']
   },
   {
@@ -19,7 +48,15 @@ const DEFAULT_MODELS = [
     provider: 'gemini',
     name: 'Gemini 3.5 Flash',
     tag: 'Google · Fast Throughput',
-    capabilities: { vision: true, reasoning: true, streaming: true },
+    capabilities: { vision: true, files: true, reasoning: true, streaming: true },
+    supportedEfforts: ['instant', 'medium', 'high']
+  },
+  {
+    id: 'gpt-4o',
+    provider: 'openai',
+    name: 'GPT-4o',
+    tag: 'OpenAI · Flagship Multimodal',
+    capabilities: { vision: true, files: true, reasoning: true, streaming: true },
     supportedEfforts: ['instant', 'medium', 'high']
   },
   {
@@ -28,7 +65,7 @@ const DEFAULT_MODELS = [
     name: 'Llama 3.3 70B',
     tag: 'Groq LPU · Ultra Fast',
     badge: 'Ultra Fast',
-    capabilities: { vision: false, reasoning: true, streaming: true },
+    capabilities: { vision: false, files: true, reasoning: true, streaming: true },
     supportedEfforts: ['instant', 'medium', 'high']
   },
   {
@@ -36,7 +73,7 @@ const DEFAULT_MODELS = [
     provider: 'groq',
     name: 'Qwen 3.6 Reasoner',
     tag: 'Groq LPU · Math & Logic',
-    capabilities: { vision: false, reasoning: true, streaming: true },
+    capabilities: { vision: false, files: true, reasoning: true, streaming: true },
     supportedEfforts: ['instant', 'medium', 'high', 'extra-high', 'pro']
   },
   {
@@ -44,1261 +81,1322 @@ const DEFAULT_MODELS = [
     provider: 'openrouter',
     name: 'OpenRouter Hub',
     tag: 'Universal AI Router',
-    capabilities: { vision: true, reasoning: true, streaming: true },
-    supportedEfforts: ['instant', 'medium', 'high']
-  },
-  {
-    id: 'gpt-4o',
-    provider: 'openai',
-    name: 'GPT-4o',
-    tag: 'OpenAI · Flagship Multimodal',
-    capabilities: { vision: true, reasoning: true, streaming: true },
+    capabilities: { vision: true, files: true, reasoning: true, streaming: true },
     supportedEfforts: ['instant', 'medium', 'high']
   },
   {
     id: 'deepseek-reasoner',
     provider: 'deepseek',
     name: 'DeepSeek R1',
-    tag: 'DeepSeek · Chain-of-Thought',
-    capabilities: { vision: false, reasoning: true, streaming: true },
+    tag: 'DeepSeek · CoT Reasoning',
+    badge: 'Deep CoT',
+    capabilities: { vision: false, files: true, reasoning: true, streaming: true },
     supportedEfforts: ['instant', 'medium', 'high', 'extra-high', 'pro']
   }
 ];
 
-// Reasoning Effort Metadata
-const EFFORT_LEVELS = {
-  'instant': {
-    name: 'Instant',
-    desc: 'Fastest responses with minimal additional reasoning.'
-  },
-  'medium': {
-    name: 'Medium',
-    desc: 'Balanced response speed and logical reasoning.'
-  },
-  'high': {
-    name: 'High',
-    desc: 'More comprehensive reasoning for complex questions.'
-  },
-  'extra-high': {
-    name: 'Extra High',
-    desc: 'Deeper step-by-step reasoning for difficult tasks.'
-  },
-  'pro': {
-    name: 'Pro',
-    desc: 'Maximum reasoning depth for advanced problems.'
-  }
+const REASONING_EFFORT_CONFIG = {
+  'instant': { label: 'Instant', budgetTokens: 0, desc: 'Fastest direct answers without hidden reasoning' },
+  'medium': { label: 'Medium', budgetTokens: 2048, desc: 'Balanced reasoning for general problem solving' },
+  'high': { label: 'High', budgetTokens: 4096, desc: 'Deeper step-by-step thinking for code & math' },
+  'extra-high': { label: 'Extra High', budgetTokens: 8192, desc: 'Extensive chain-of-thought analysis' },
+  'pro': { label: 'Pro', budgetTokens: 16384, desc: 'Maximum computational effort for complex research' }
 };
 
-// Persona System
-const PERSONAS = {
-  general: {
-    name: 'General Assistant',
-    prompt: 'You are oska.AI, a calm, intelligent, and highly capable AI assistant. Answer queries directly with clarity, nuance, and precision.'
-  },
-  coder: {
-    name: 'Software Engineer',
-    prompt: 'You are an expert Principal Software Engineer. Provide clean, modular, production-ready, and secure code with clear architectural explanations.'
-  },
-  academic: {
-    name: 'Academic Researcher',
-    prompt: 'You are an Academic Research Assistant. Provide rigorous, structured explanations with scientific accuracy and objective analysis.'
-  },
-  creative: {
-    name: 'Creative Writer',
-    prompt: 'You are an imaginative and expressive creative writer. Provide engaging, literary prose and compelling ideas.'
-  }
+// -------------------------------------------------------------
+// 3. Application State Store
+// -------------------------------------------------------------
+let state = {
+  user: null,
+  conversations: [],
+  activeConversationId: null,
+  selectedModel: 'gemini-3.7-flash',
+  reasoningEffort: 'extra-high',
+  responseLanguage: 'auto', // 'auto' | 'english' | 'sinhala' | 'singlish'
+  theme: localStorage.getItem('oska_theme') || 'light',
+  isGenerating: false,
+  attachments: [],
+  activeTool: null, // 'web-search' | 'research' | 'data-analysis'
+  abortController: null,
+  activeSpeechRecognition: null
 };
 
-class OskaAIApp {
-  constructor() {
-    const legacyChats = this.loadStorage('aistudio_conversations_v4', null);
-    this.conversations = this.loadStorage('oska_conversations_v1', legacyChats || []);
-    
-    this.currentChatId = null;
-    this.activeModel = this.loadStorage('oska_model', 'gemini-3.7-flash');
-    this.activePersona = this.loadStorage('oska_persona', 'general');
-    this.theme = this.loadStorage('oska_theme', 'light');
-    this.effortLevel = this.loadStorage('oska_effort', 'extra-high');
-    this.isGenerating = false;
-    this.abortController = null;
-    this.pendingAttachments = [];
+// -------------------------------------------------------------
+// 4. Multilingual & Singlish Intelligence Engine
+// -------------------------------------------------------------
+function detectLanguageIntent(text) {
+  if (!text) return 'english';
 
-    this.initDOM();
-    this.applyTheme(this.theme);
-    this.setupMarkdown();
-    this.bindEvents();
-    this.renderSidebar();
-    this.updateControlsUI();
-    this.updateGreeting();
-    this.updatePageTitle();
+  // 1. Check for Sinhala Unicode characters
+  const hasSinhalaUnicode = /[\u0D80-\u0DFF]/.test(text);
+  if (hasSinhalaUnicode) return 'sinhala';
+
+  // 2. Check for Singlish keywords
+  const singlishPattern = /\b(mata|oya|mokakda|kohomada|karanna|krnn|hadanna|ekak|thiyenawa|kiyanna|puluwanda|ane|meka|monawada|kohomath|dan|onna|ehema|thama|kiyala|hithanna|danna|wadak|nadda|mokada|kawda|koheda)\b/i;
+  if (singlishPattern.test(text)) return 'singlish';
+
+  return 'english';
+}
+
+function buildLanguageSystemPrompt(userText, selectedLang) {
+  let langMode = selectedLang || 'auto';
+  if (langMode === 'auto') {
+    langMode = detectLanguageIntent(userText);
   }
 
-  // -------------------------------------------------------------
-  // Storage & State Helpers
-  // -------------------------------------------------------------
-  loadStorage(key, fallback) {
-    try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : fallback;
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  saveStorage(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (_) {}
-  }
-
-  // -------------------------------------------------------------
-  // DOM Initialization
-  // -------------------------------------------------------------
-  initDOM() {
-    this.sidebar = document.getElementById('sidebar');
-    this.sidebarBackdrop = document.getElementById('sidebarBackdrop');
-    this.sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
-    this.sidebarHistory = document.getElementById('sidebarHistory');
-    this.sidebarSearchInput = document.getElementById('sidebarSearchInput');
-    this.newChatBtn = document.getElementById('newChatBtn');
-    this.headerNewChatBtn = document.getElementById('headerNewChatBtn');
-    this.brandHomeBtn = document.getElementById('brandHomeBtn');
-    this.headerChatTitle = document.getElementById('headerChatTitle');
-
-    this.chatScrollArea = document.getElementById('chatScrollArea');
-    this.welcomeScreen = document.getElementById('welcomeScreen');
-    this.welcomeGreeting = document.getElementById('welcomeGreeting');
-    this.conversationContainer = document.getElementById('conversationContainer');
-
-    this.composerBox = document.getElementById('composerBox');
-    this.chatInput = document.getElementById('chatInput');
-    this.sendBtn = document.getElementById('sendBtn');
-    this.stopBtn = document.getElementById('stopBtn');
-    this.attachBtn = document.getElementById('attachBtn');
-    this.fileInput = document.getElementById('fileInput');
-    this.attachmentPreviewBar = document.getElementById('attachmentPreviewBar');
-
-    // Independent Composer Control Buttons
-    this.composerModelBtn = document.getElementById('composerModelBtn');
-    this.composerModelLabel = document.getElementById('composerModelLabel');
-    this.composerModelPopover = document.getElementById('composerModelPopover');
-    this.modelPopoverList = document.getElementById('modelPopoverList');
-
-    this.composerEffortBtn = document.getElementById('composerEffortBtn');
-    this.composerEffortLabel = document.getElementById('composerEffortLabel');
-    this.composerEffortPopover = document.getElementById('composerEffortPopover');
-    this.effortPopoverList = document.getElementById('effortPopoverList');
-
-    this.popoverBackdrop = document.getElementById('popoverBackdrop');
-
-    // Voice Input Elements
-    this.voiceMicBtn = document.getElementById('voiceMicBtn');
-    this.voiceWaveformBadge = document.getElementById('voiceWaveformBadge');
-    this.recognition = null;
-    this.isListening = false;
-
-    // Tools & Settings
-    this.toolsMenuBtn = document.getElementById('toolsMenuBtn');
-    this.toolsPopover = document.getElementById('toolsPopover');
-    this.toolWebSearchBtn = document.getElementById('toolWebSearchBtn');
-    this.toolCreateImageBtn = document.getElementById('toolCreateImageBtn');
-    this.toolCreateVideoBtn = document.getElementById('toolCreateVideoBtn');
-
-    this.themeToggleBtn = document.getElementById('themeToggleBtn');
-    this.themeIcon = document.getElementById('themeIcon');
-    this.openSettingsBtn = document.getElementById('openSettingsBtn');
-    this.closeSettingsBtn = document.getElementById('closeSettingsBtn');
-    this.saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    this.settingsModal = document.getElementById('settingsModal');
-    this.themeSelect = document.getElementById('themeSelect');
-    this.defaultModelSelect = document.getElementById('defaultModelSelect');
-    this.clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
-    this.toastContainer = document.getElementById('toastContainer');
-
-    this.initVoiceRecognition();
-  }
-
-  // -------------------------------------------------------------
-  // Markdown & Highlight Setup
-  // -------------------------------------------------------------
-  setupMarkdown() {
-    if (window.marked) {
-      marked.setOptions({
-        highlight: (code, lang) => {
-          if (window.hljs) {
-            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-            return hljs.highlight(code, { language }).value;
-          }
-          return code;
-        },
-        breaks: true,
-        gfm: true
-      });
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Theme Management
-  // -------------------------------------------------------------
-  applyTheme(theme) {
-    this.theme = theme;
-    document.documentElement.setAttribute('data-theme', theme);
-    this.saveStorage('oska_theme', theme);
-    if (this.themeSelect) this.themeSelect.value = theme;
-    if (this.themeIcon) {
-      this.themeIcon.setAttribute('data-lucide', theme === 'dark' ? 'sun' : 'moon');
-      this.refreshIcons();
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Smart Greeting & Page Title
-  // -------------------------------------------------------------
-  updateGreeting() {
-    if (!this.welcomeGreeting) return;
-    const hour = new Date().getHours();
-    let timeGreeting = 'What would you like to explore today?';
-    if (hour < 12) timeGreeting = 'Good morning. What can I help with?';
-    else if (hour < 18) timeGreeting = 'Good afternoon. How can I assist?';
-    else timeGreeting = 'Good evening. What would you like to work on?';
-    this.welcomeGreeting.textContent = timeGreeting;
-  }
-
-  updatePageTitle() {
-    const chat = this.conversations.find(c => c.id === this.currentChatId);
-    if (chat && chat.title) {
-      document.title = `${chat.title} | oska.AI`;
-      if (this.headerChatTitle) this.headerChatTitle.textContent = chat.title;
-    } else {
-      document.title = 'oska.AI V1';
-      if (this.headerChatTitle) this.headerChatTitle.textContent = 'New chat';
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Voice Input (Speech-to-Text)
-  // -------------------------------------------------------------
-  initVoiceRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-
-      this.recognition.onstart = () => {
-        this.isListening = true;
-        this.voiceMicBtn.classList.add('listening');
-        this.voiceWaveformBadge.classList.remove('hidden');
-        this.showToast('Voice listening active...', 'info');
-      };
-
-      this.recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        if (transcript) {
-          this.chatInput.value = transcript;
-          this.autoResizeTextarea();
-          this.updateSendButtonState();
-        }
-      };
-
-      this.recognition.onerror = (event) => {
-        console.warn('Speech recognition error:', event.error);
-        this.stopVoiceRecognition();
-      };
-
-      this.recognition.onend = () => {
-        this.stopVoiceRecognition();
-      };
-    }
-  }
-
-  toggleVoiceRecognition() {
-    if (!this.recognition) {
-      this.showToast('Speech recognition not supported in this browser.', 'error');
-      return;
-    }
-
-    if (this.isListening) {
-      this.recognition.stop();
-      this.stopVoiceRecognition();
-    } else {
-      try {
-        this.recognition.start();
-      } catch (err) {
-        this.stopVoiceRecognition();
-      }
-    }
-  }
-
-  stopVoiceRecognition() {
-    this.isListening = false;
-    if (this.voiceMicBtn) this.voiceMicBtn.classList.remove('listening');
-    if (this.voiceWaveformBadge) this.voiceWaveformBadge.classList.add('hidden');
-  }
-
-  // -------------------------------------------------------------
-  // Composer Controls UI & Popovers Rendering
-  // -------------------------------------------------------------
-  updateControlsUI() {
-    const model = DEFAULT_MODELS.find(m => m.id === this.activeModel) || DEFAULT_MODELS[0];
-    
-    // Validate supported effort level for this model
-    if (model.supportedEfforts && !model.supportedEfforts.includes(this.effortLevel)) {
-      this.effortLevel = model.supportedEfforts[model.supportedEfforts.length - 1];
-      this.saveStorage('oska_effort', this.effortLevel);
-    }
-
-    const effort = EFFORT_LEVELS[this.effortLevel] || EFFORT_LEVELS['extra-high'];
-
-    if (this.composerModelLabel) this.composerModelLabel.textContent = model.name;
-    if (this.composerEffortLabel) this.composerEffortLabel.textContent = effort.name;
-
-    // Render Model Popover List
-    if (this.modelPopoverList) {
-      this.modelPopoverList.innerHTML = '';
-      DEFAULT_MODELS.forEach(m => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = `popover-item ${m.id === this.activeModel ? 'active' : ''}`;
-        item.innerHTML = `
-          <div class="popover-item-left">
-            <div>
-              <span class="item-title">${this.escapeHtml(m.name)}</span>
-              <span class="item-desc">${this.escapeHtml(m.tag)}</span>
-            </div>
-          </div>
-          <span class="check-icon">✓</span>
-        `;
-        item.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.activeModel = m.id;
-          this.saveStorage('oska_model', m.id);
-
-          const chat = this.conversations.find(c => c.id === this.currentChatId);
-          if (chat) chat.selectedModelId = m.id;
-
-          this.updateControlsUI();
-          this.closeAllPopovers();
-          this.showToast(`Model: ${m.name}`, 'info');
-        });
-        this.modelPopoverList.appendChild(item);
-      });
-    }
-
-    // Render Effort Popover List
-    if (this.effortPopoverList) {
-      this.effortPopoverList.innerHTML = '';
-      const allowedEfforts = model.supportedEfforts || ['instant', 'medium', 'high', 'extra-high', 'pro'];
-      
-      allowedEfforts.forEach(effKey => {
-        const effData = EFFORT_LEVELS[effKey];
-        if (!effData) return;
-
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = `popover-item ${effKey === this.effortLevel ? 'active' : ''}`;
-        item.innerHTML = `
-          <div class="popover-item-left">
-            <div>
-              <span class="item-title">${this.escapeHtml(effData.name)}</span>
-              <span class="item-desc">${this.escapeHtml(effData.desc)}</span>
-            </div>
-          </div>
-          <span class="check-icon">✓</span>
-        `;
-        item.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.effortLevel = effKey;
-          this.saveStorage('oska_effort', effKey);
-
-          const chat = this.conversations.find(c => c.id === this.currentChatId);
-          if (chat) chat.reasoningLevel = effKey;
-
-          this.updateControlsUI();
-          this.closeAllPopovers();
-          this.showToast(`Reasoning: ${effData.name}`, 'info');
-        });
-        this.effortPopoverList.appendChild(item);
-      });
-    }
-  }
-
-  toggleModelPopover() {
-    if (this.isGenerating) return;
-    const isHidden = this.composerModelPopover.classList.contains('hidden');
-    this.closeAllPopovers();
-    if (isHidden) {
-      this.updateControlsUI();
-      this.positionPopover(this.composerModelPopover, this.composerModelBtn, true);
-      this.composerModelPopover.classList.remove('hidden');
-      this.composerModelBtn.classList.add('active');
-      this.composerModelBtn.setAttribute('aria-expanded', 'true');
-      if (window.innerWidth <= 768 && this.popoverBackdrop) {
-        this.popoverBackdrop.classList.remove('hidden');
-      }
-    }
-  }
-
-  toggleEffortPopover() {
-    if (this.isGenerating) return;
-    const isHidden = this.composerEffortPopover.classList.contains('hidden');
-    this.closeAllPopovers();
-    if (isHidden) {
-      this.updateControlsUI();
-      this.positionPopover(this.composerEffortPopover, this.composerEffortBtn, true);
-      this.composerEffortPopover.classList.remove('hidden');
-      this.composerEffortBtn.classList.add('active');
-      this.composerEffortBtn.setAttribute('aria-expanded', 'true');
-      if (window.innerWidth <= 768 && this.popoverBackdrop) {
-        this.popoverBackdrop.classList.remove('hidden');
-      }
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Event Bindings
-  // -------------------------------------------------------------
-  bindEvents() {
-    // Sidebar toggle for desktop & mobile
-    this.sidebarToggleBtn.addEventListener('click', () => {
-      if (window.innerWidth <= 768) {
-        const isOpen = this.sidebar.classList.toggle('mobile-open');
-        this.sidebarBackdrop.classList.toggle('hidden', !isOpen);
-      } else {
-        this.sidebar.classList.toggle('collapsed');
-      }
-    });
-
-    // Mobile backdrop click to close sidebar
-    if (this.sidebarBackdrop) {
-      this.sidebarBackdrop.addEventListener('click', () => {
-        this.sidebar.classList.remove('mobile-open');
-        this.sidebarBackdrop.classList.add('hidden');
-      });
-    }
-
-    // Generic Popover Backdrop Click to Close
-    if (this.popoverBackdrop) {
-      this.popoverBackdrop.addEventListener('click', () => this.closeAllPopovers());
-    }
-
-    // Theme toggle button
-    this.themeToggleBtn.addEventListener('click', () => {
-      this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');
-    });
-
-    // Voice button trigger
-    this.voiceMicBtn.addEventListener('click', () => this.toggleVoiceRecognition());
-
-    // Direct Model & Effort Button Click Triggers
-    this.composerModelBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleModelPopover();
-    });
-
-    this.composerEffortBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleEffortPopover();
-    });
-
-    // Tools Menu Popover Trigger
-    this.toolsMenuBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isHidden = this.toolsPopover.classList.contains('hidden');
-      this.closeAllPopovers();
-      if (isHidden) {
-        this.positionPopover(this.toolsPopover, this.toolsMenuBtn, true);
-        this.toolsPopover.classList.remove('hidden');
-        if (window.innerWidth <= 768 && this.popoverBackdrop) {
-          this.popoverBackdrop.classList.remove('hidden');
-        }
-      }
-    });
-
-    // Tools Actions
-    if (this.toolWebSearchBtn) {
-      this.toolWebSearchBtn.addEventListener('click', () => {
-        this.closeAllPopovers();
-        this.chatInput.value = '/search ';
-        this.chatInput.focus();
-        this.autoResizeTextarea();
-        this.updateSendButtonState();
-        this.showToast('Web Search mode enabled. Enter query.', 'info');
-      });
-    }
-
-    this.toolCreateImageBtn.addEventListener('click', () => {
-      this.closeAllPopovers();
-      this.chatInput.value = '/image ';
-      this.chatInput.focus();
-      this.autoResizeTextarea();
-      this.updateSendButtonState();
-      this.showToast('Image mode activated. Describe your visual.', 'info');
-    });
-
-    this.toolCreateVideoBtn.addEventListener('click', () => {
-      this.closeAllPopovers();
-      this.chatInput.value = '/video ';
-      this.chatInput.focus();
-      this.autoResizeTextarea();
-      this.updateSendButtonState();
-      this.showToast('Video mode activated. Describe your scene.', 'info');
-    });
-
-    // New chat triggers
-    const handleNewChat = () => this.startNewChat();
-    this.newChatBtn.addEventListener('click', handleNewChat);
-    this.headerNewChatBtn.addEventListener('click', handleNewChat);
-    this.brandHomeBtn.addEventListener('click', handleNewChat);
-
-    // Global keyboard shortcuts: Ctrl+K for new chat, Esc to close popovers
-    window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        this.startNewChat();
-      } else if (e.key === 'Escape') {
-        this.closeAllPopovers();
-      }
-    });
-
-    // Composer Input Events
-    this.chatInput.addEventListener('input', () => {
-      this.autoResizeTextarea();
-      this.updateSendButtonState();
-    });
-
-    this.chatInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        if (!this.sendBtn.disabled && !this.isGenerating) {
-          this.handleSendMessage();
-        }
-      }
-    });
-
-    this.sendBtn.addEventListener('click', () => this.handleSendMessage());
-    this.stopBtn.addEventListener('click', () => this.stopGeneration());
-
-    // File attachments
-    this.attachBtn.addEventListener('click', () => this.fileInput.click());
-    this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e.target.files));
-
-    // Welcome Shortcut Chips
-    document.querySelectorAll('.shortcut-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        const prompt = chip.getAttribute('data-prompt');
-        this.chatInput.value = prompt;
-        this.autoResizeTextarea();
-        this.updateSendButtonState();
-        this.chatInput.focus();
-      });
-    });
-
-    // Settings Modal
-    this.openSettingsBtn.addEventListener('click', () => {
-      this.settingsModal.classList.remove('hidden');
-    });
-    this.closeSettingsBtn.addEventListener('click', () => {
-      this.settingsModal.classList.add('hidden');
-    });
-    this.saveSettingsBtn.addEventListener('click', () => {
-      this.applyTheme(this.themeSelect.value);
-      this.activeModel = this.defaultModelSelect.value;
-      this.saveStorage('oska_model', this.activeModel);
-      this.updateControlsUI();
-      this.settingsModal.classList.add('hidden');
-      this.showToast('Settings saved', 'success');
-    });
-
-    this.clearAllHistoryBtn.addEventListener('click', () => {
-      this.conversations = [];
-      this.saveStorage('oska_conversations_v1', []);
-      this.startNewChat();
-      this.settingsModal.classList.add('hidden');
-      this.showToast('Conversation history cleared', 'info');
-    });
-
-    // Sidebar search
-    this.sidebarSearchInput.addEventListener('input', (e) => {
-      this.renderSidebar(e.target.value.trim().toLowerCase());
-    });
-
-    // Global click-outside to close popovers
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.composer-popover') && 
-          !e.target.closest('#composerModelBtn') && 
-          !e.target.closest('#composerEffortBtn') && 
-          !e.target.closest('#toolsMenuBtn')) {
-        this.closeAllPopovers();
-      }
-    });
-  }
-
-  // -------------------------------------------------------------
-  // Popover Helpers
-  // -------------------------------------------------------------
-  closeAllPopovers() {
-    if (this.composerModelPopover) this.composerModelPopover.classList.add('hidden');
-    if (this.composerEffortPopover) this.composerEffortPopover.classList.add('hidden');
-    if (this.toolsPopover) this.toolsPopover.classList.add('hidden');
-    if (this.popoverBackdrop) this.popoverBackdrop.classList.add('hidden');
-
-    if (this.composerModelBtn) {
-      this.composerModelBtn.classList.remove('active');
-      this.composerModelBtn.setAttribute('aria-expanded', 'false');
-    }
-    if (this.composerEffortBtn) {
-      this.composerEffortBtn.classList.remove('active');
-      this.composerEffortBtn.setAttribute('aria-expanded', 'false');
-    }
-  }
-
-  positionPopover(popover, triggerEl, isUpward = false) {
-    if (window.innerWidth <= 768) return; // Handled by responsive mobile bottom sheet CSS
-    const rect = triggerEl.getBoundingClientRect();
-    if (isUpward) {
-      popover.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-      popover.style.top = 'auto';
-      popover.style.left = `${Math.min(rect.left, window.innerWidth - 310)}px`;
-      popover.style.right = 'auto';
-    } else {
-      popover.style.top = `${rect.bottom + 6}px`;
-      popover.style.bottom = 'auto';
-      popover.style.left = `${Math.min(rect.left, window.innerWidth - 310)}px`;
-      popover.style.right = 'auto';
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Composer & Textarea Sizing
-  // -------------------------------------------------------------
-  autoResizeTextarea() {
-    this.chatInput.style.height = 'auto';
-    this.chatInput.style.height = `${Math.min(this.chatInput.scrollHeight, 180)}px`;
-  }
-
-  updateSendButtonState() {
-    const hasText = Boolean(this.chatInput.value.trim());
-    const hasAttachments = this.pendingAttachments.length > 0;
-    this.sendBtn.disabled = (!hasText && !hasAttachments) || this.isGenerating;
-  }
-
-  // -------------------------------------------------------------
-  // Attachment Handling
-  // -------------------------------------------------------------
-  handleFileUpload(files) {
-    if (!files || files.length === 0) return;
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      const isImage = file.type.startsWith('image/');
-      
-      reader.onload = (e) => {
-        const attachment = {
-          id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          isImage: isImage,
-          data: e.target.result
-        };
-        this.pendingAttachments.push(attachment);
-        this.renderAttachmentChips();
-        this.updateSendButtonState();
-      };
-
-      if (isImage) {
-        reader.readAsDataURL(file);
-      } else {
-        reader.readAsText(file);
-      }
-    });
-    this.fileInput.value = '';
-  }
-
-  renderAttachmentChips() {
-    if (this.pendingAttachments.length === 0) {
-      this.attachmentPreviewBar.classList.add('hidden');
-      this.attachmentPreviewBar.innerHTML = '';
-      return;
-    }
-
-    this.attachmentPreviewBar.classList.remove('hidden');
-    this.attachmentPreviewBar.innerHTML = '';
-
-    this.pendingAttachments.forEach((att, index) => {
-      const chip = document.createElement('div');
-      chip.className = 'attachment-chip';
-      chip.innerHTML = `
-        ${att.isImage ? `<img src="${att.data}" class="chip-thumb" alt="Preview">` : `<i data-lucide="file-text" style="width: 14px; height: 14px;"></i>`}
-        <span class="chip-name">${this.escapeHtml(att.name)}</span>
-        <button type="button" class="chip-remove" title="Remove" aria-label="Remove attachment">✕</button>
-      `;
-      chip.querySelector('.chip-remove').addEventListener('click', () => {
-        this.pendingAttachments.splice(index, 1);
-        this.renderAttachmentChips();
-        this.updateSendButtonState();
-      });
-      this.attachmentPreviewBar.appendChild(chip);
-    });
-    this.refreshIcons();
-  }
-
-  // -------------------------------------------------------------
-  // Conversation Management
-  // -------------------------------------------------------------
-  startNewChat() {
-    this.currentChatId = null;
-    this.welcomeScreen.classList.remove('hidden');
-    this.conversationContainer.classList.add('hidden');
-    this.conversationContainer.innerHTML = '';
-    this.chatInput.value = '';
-    this.pendingAttachments = [];
-    this.renderAttachmentChips();
-    this.autoResizeTextarea();
-    this.updateSendButtonState();
-    this.renderSidebar();
-    this.updatePageTitle();
-    this.chatInput.focus();
-
-    // Close mobile drawer if open
-    if (window.innerWidth <= 768) {
-      this.sidebar.classList.remove('mobile-open');
-      this.sidebarBackdrop.classList.add('hidden');
-    }
-  }
-
-  loadChat(chatId) {
-    const chat = this.conversations.find(c => c.id === chatId);
-    if (!chat) return;
-
-    this.currentChatId = chatId;
-    if (chat.selectedModelId) this.activeModel = chat.selectedModelId;
-    if (chat.reasoningLevel) this.effortLevel = chat.reasoningLevel;
-
-    this.welcomeScreen.classList.add('hidden');
-    this.conversationContainer.classList.remove('hidden');
-    this.conversationContainer.innerHTML = '';
-
-    chat.messages.forEach(msg => {
-      this.renderMessageElement(msg);
-    });
-
-    this.updateControlsUI();
-    this.renderSidebar();
-    this.updatePageTitle();
-    this.scrollToBottom();
-
-    // Close mobile drawer if open
-    if (window.innerWidth <= 768) {
-      this.sidebar.classList.remove('mobile-open');
-      this.sidebarBackdrop.classList.add('hidden');
-    }
-  }
-
-  deleteChat(chatId, e) {
-    if (e) e.stopPropagation();
-    this.conversations = this.conversations.filter(c => c.id !== chatId);
-    this.saveStorage('oska_conversations_v1', this.conversations);
-    if (this.currentChatId === chatId) {
-      this.startNewChat();
-    } else {
-      this.renderSidebar();
-    }
-    this.showToast('Conversation deleted', 'info');
-  }
-
-  renderSidebar(filterQuery = '') {
-    this.sidebarHistory.innerHTML = '';
-
-    let chats = [...this.conversations].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
-    if (filterQuery) {
-      chats = chats.filter(c => c.title.toLowerCase().includes(filterQuery));
-    }
-
-    if (chats.length === 0) {
-      this.sidebarHistory.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-muted); padding: 1rem 0.5rem; text-align: center;">No conversations yet</div>`;
-      return;
-    }
-
-    // Time groups: Today, Yesterday, Previous 7 days, Older
-    const now = new Date();
-    const groups = {
-      today: { title: 'Today', items: [] },
-      yesterday: { title: 'Yesterday', items: [] },
-      week: { title: 'Previous 7 days', items: [] },
-      older: { title: 'Older', items: [] }
-    };
-
-    chats.forEach(chat => {
-      const chatDate = new Date(chat.updatedAt || chat.createdAt);
-      const diffHours = (now - chatDate) / (1000 * 60 * 60);
-
-      if (diffHours < 24 && now.getDate() === chatDate.getDate()) {
-        groups.today.items.push(chat);
-      } else if (diffHours < 48) {
-        groups.yesterday.items.push(chat);
-      } else if (diffHours < 168) {
-        groups.week.items.push(chat);
-      } else {
-        groups.older.items.push(chat);
-      }
-    });
-
-    Object.values(groups).forEach(group => {
-      if (group.items.length === 0) return;
-
-      const groupHeader = document.createElement('div');
-      groupHeader.className = 'history-group-title';
-      groupHeader.textContent = group.title;
-      this.sidebarHistory.appendChild(groupHeader);
-
-      group.items.forEach(chat => {
-        const item = document.createElement('div');
-        item.className = `chat-item ${chat.id === this.currentChatId ? 'active' : ''}`;
-        item.innerHTML = `
-          <span class="chat-item-title">${this.escapeHtml(chat.title || 'New Conversation')}</span>
-          <div class="chat-item-actions">
-            <button type="button" class="chat-action-btn delete" title="Delete conversation" aria-label="Delete conversation">
-              <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
-            </button>
-          </div>
-        `;
-
-        item.addEventListener('click', () => this.loadChat(chat.id));
-        item.querySelector('.delete').addEventListener('click', (e) => this.deleteChat(chat.id, e));
-
-        this.sidebarHistory.appendChild(item);
-      });
-    });
-
-    this.refreshIcons();
-  }
-
-  // -------------------------------------------------------------
-  // Message Sending & AI Execution
-  // -------------------------------------------------------------
-  async handleSendMessage() {
-    const rawText = this.chatInput.value.trim();
-    const attachments = [...this.pendingAttachments];
-
-    if (!rawText && attachments.length === 0) return;
-
-    // Reset composer state & close popovers
-    this.closeAllPopovers();
-    this.chatInput.value = '';
-    this.pendingAttachments = [];
-    this.renderAttachmentChips();
-    this.autoResizeTextarea();
-    this.updateSendButtonState();
-
-    // Hide welcome screen
-    this.welcomeScreen.classList.add('hidden');
-    this.conversationContainer.classList.remove('hidden');
-
-    // Create or retrieve active conversation
-    let chat = this.conversations.find(c => c.id === this.currentChatId);
-    if (!chat) {
-      chat = {
-        id: 'chat_' + Date.now(),
-        title: rawText.slice(0, 32) || 'New Conversation',
-        selectedModelId: this.activeModel,
-        reasoningLevel: this.effortLevel,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        messages: []
-      };
-      this.conversations.unshift(chat);
-      this.currentChatId = chat.id;
-    } else {
-      chat.selectedModelId = this.activeModel;
-      chat.reasoningLevel = this.effortLevel;
-    }
-
-    // User Message
-    const userMsg = {
-      role: 'user',
-      content: rawText,
-      attachments: attachments,
-      timestamp: new Date().toISOString()
-    };
-    chat.messages.push(userMsg);
-    chat.updatedAt = new Date().toISOString();
-    this.renderMessageElement(userMsg);
-    this.updatePageTitle();
-    this.scrollToBottom();
-
-    // Check for Image / Video / Search Commands
-    if (rawText.startsWith('/search')) {
-      const searchQuery = rawText.replace('/search', '').trim();
-      userMsg.aiPrompt = `[Web Search Mode] Please perform a real-time web search and provide up-to-date factual analysis with sources for: "${searchQuery}"`;
-    } else if (rawText.startsWith('/image')) {
-      await this.handleImageGeneration(rawText.replace('/image', '').trim(), chat);
-      return;
-    } else if (rawText.startsWith('/video')) {
-      await this.handleVideoGeneration(rawText.replace('/video', '').trim(), chat);
-      return;
-    }
-
-    // Execute AI Model Chat
-    await this.executeAICompletion(chat);
-  }
-
-  async executeAICompletion(chat) {
-    this.isGenerating = true;
-    this.composerModelBtn.disabled = true;
-    this.composerEffortBtn.disabled = true;
-    this.sendBtn.classList.add('hidden');
-    this.stopBtn.classList.remove('hidden');
-    this.abortController = new AbortController();
-
-    const assistantMsg = {
-      role: 'assistant',
-      content: '',
-      reasoning_content: '',
-      timestamp: new Date().toISOString()
-    };
-    chat.messages.push(assistantMsg);
-
-    const messageRow = this.renderMessageElement(assistantMsg);
-    const bubble = messageRow.querySelector('.message-bubble');
-    bubble.innerHTML = '<span class="typing-indicator">...</span>';
-
-    try {
-      const persona = PERSONAS[this.activePersona] || PERSONAS.general;
-      const payload = {
-        model: this.activeModel,
-        messages: chat.messages.slice(0, -1),
-        systemPrompt: persona.prompt,
-        temperature: 0.7,
-        effort: this.effortLevel
-      };
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: this.abortController.signal
-      });
-
-      if (!res.ok) {
-        throw new Error(`API returned HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || 'No response generated.';
-      const reasoning = data.choices?.[0]?.message?.reasoning_content || '';
-
-      assistantMsg.content = content;
-      assistantMsg.reasoning_content = reasoning;
-
-      // Stream text smoothly into the message bubble
-      let streamText = '';
-      const words = content.split(' ');
-      
-      let reasoningHeaderHtml = '';
-      if (reasoning) {
-        reasoningHeaderHtml = `
-          <div class="reasoning-box">
-            <div class="reasoning-header">
-              <span>Thought Process</span>
-              <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
-            </div>
-            <div class="reasoning-content">${this.escapeHtml(reasoning)}</div>
-          </div>
-        `;
-      }
-
-      for (let i = 0; i < words.length; i++) {
-        if (this.abortController?.signal.aborted) break;
-        streamText += (i === 0 ? '' : ' ') + words[i];
-        bubble.innerHTML = reasoningHeaderHtml + this.renderMarkdown(streamText);
-        this.scrollToBottom();
-        await new Promise(r => setTimeout(r, 12));
-      }
-
-      bubble.innerHTML = reasoningHeaderHtml + this.renderMarkdown(content);
-      this.setupMessageActionListeners(messageRow, assistantMsg);
-      this.refreshIcons();
-
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        bubble.innerHTML = `<div style="color: var(--text-secondary); font-style: italic;">Response paused or connection timed out. Click regenerate to retry.</div>`;
-      }
-    } finally {
-      this.isGenerating = false;
-      this.composerModelBtn.disabled = false;
-      this.composerEffortBtn.disabled = false;
-      this.sendBtn.classList.remove('hidden');
-      this.stopBtn.classList.add('hidden');
-      this.saveStorage('oska_conversations_v1', this.conversations);
-      this.renderSidebar();
-      this.updateSendButtonState();
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Image Generation Handler
-  // -------------------------------------------------------------
-  async handleImageGeneration(promptText, chat) {
-    this.isGenerating = true;
-    this.sendBtn.classList.add('hidden');
-    this.stopBtn.classList.remove('hidden');
-
-    const assistantMsg = {
-      role: 'assistant',
-      content: `### 🎨 oska.AI Visual Generation\n*Prompt: "${promptText}"*\n\nGenerating visual composition...`,
-      timestamp: new Date().toISOString()
-    };
-    chat.messages.push(assistantMsg);
-
-    const messageRow = this.renderMessageElement(assistantMsg);
-    const bubble = messageRow.querySelector('.message-bubble');
-
-    try {
-      const res = await fetch('/api/images/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptText })
-      });
-
-      const data = await res.json();
-      if (data.url) {
-        bubble.innerHTML = `
-          <div class="ai-media-card">
-            <img src="${data.url}" alt="${this.escapeHtml(promptText)}" loading="lazy">
-            <div class="ai-media-footer">
-              <span>${this.escapeHtml(promptText)}</span>
-              <a href="${data.url}" target="_blank" download="oska_image.jpg" class="media-action-btn">
-                <i data-lucide="download" style="width: 13px; height: 13px;"></i>
-                <span>Download</span>
-              </a>
-            </div>
-          </div>
-        `;
-        assistantMsg.content = `[Image generated for: ${promptText}]`;
-      }
-    } catch (_) {
-      bubble.innerHTML = `<p>Image generation service unavailable. Please retry.</p>`;
-    } finally {
-      this.isGenerating = false;
-      this.sendBtn.classList.remove('hidden');
-      this.stopBtn.classList.add('hidden');
-      this.saveStorage('oska_conversations_v1', this.conversations);
-      this.refreshIcons();
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Video Generation Handler
-  // -------------------------------------------------------------
-  async handleVideoGeneration(promptText, chat) {
-    this.isGenerating = true;
-    this.sendBtn.classList.add('hidden');
-    this.stopBtn.classList.remove('hidden');
-
-    const assistantMsg = {
-      role: 'assistant',
-      content: `### 🎬 oska.AI Video Generation\n*Prompt: "${promptText}"*\n\nGenerating cinematic keyframes...`,
-      timestamp: new Date().toISOString()
-    };
-    chat.messages.push(assistantMsg);
-
-    const messageRow = this.renderMessageElement(assistantMsg);
-    const bubble = messageRow.querySelector('.message-bubble');
-
-    try {
-      const res = await fetch('/api/videos/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptText })
-      });
-
-      const data = await res.json();
-      if (data.previewUrl) {
-        bubble.innerHTML = `
-          <div class="ai-media-card">
-            <img src="${data.previewUrl}" alt="${this.escapeHtml(promptText)}" loading="lazy">
-            <div class="ai-media-footer">
-              <span>Cinematic Scene • Completed</span>
-              <a href="${data.previewUrl}" target="_blank" download="oska_video_scene.jpg" class="media-action-btn">
-                <i data-lucide="download" style="width: 13px; height: 13px;"></i>
-                <span>Save Scene</span>
-              </a>
-            </div>
-          </div>
-        `;
-        assistantMsg.content = `[AI Video generated for: ${promptText}]`;
-      }
-    } catch (_) {
-      bubble.innerHTML = `<p>Video generation service timed out. Please retry.</p>`;
-    } finally {
-      this.isGenerating = false;
-      this.sendBtn.classList.remove('hidden');
-      this.stopBtn.classList.add('hidden');
-      this.saveStorage('oska_conversations_v1', this.conversations);
-      this.refreshIcons();
-    }
-  }
-
-  stopGeneration() {
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    this.isGenerating = false;
-    this.composerModelBtn.disabled = false;
-    this.composerEffortBtn.disabled = false;
-    this.sendBtn.classList.remove('hidden');
-    this.stopBtn.classList.add('hidden');
-    this.showToast('Generation stopped', 'info');
-  }
-
-  // -------------------------------------------------------------
-  // Message Element Rendering & Markdown
-  // -------------------------------------------------------------
-  renderMessageElement(msg) {
-    const row = document.createElement('div');
-    row.className = `message-row ${msg.role}`;
-
-    let attachmentsHtml = '';
-    if (msg.attachments && msg.attachments.length > 0) {
-      attachmentsHtml = `
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
-          ${msg.attachments.map(att => att.isImage ? `<img src="${att.data}" style="max-height: 120px; border-radius: 6px;" alt="Image">` : `<div class="attachment-chip"><i data-lucide="file"></i> ${this.escapeHtml(att.name)}</div>`).join('')}
-        </div>
-      `;
-    }
-
-    let reasoningHeaderHtml = '';
-    if (msg.reasoning_content) {
-      reasoningHeaderHtml = `
-        <div class="reasoning-box">
-          <div class="reasoning-header">
-            <span>Thought Process</span>
-            <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
-          </div>
-          <div class="reasoning-content">${this.escapeHtml(msg.reasoning_content)}</div>
-        </div>
-      `;
-    }
-
-    row.innerHTML = `
-      ${attachmentsHtml}
-      <div class="message-bubble">
-        ${reasoningHeaderHtml}
-        ${this.renderMarkdown(msg.content)}
-      </div>
-      <div class="message-actions">
-        <button type="button" class="msg-action-btn copy-msg" title="Copy text" aria-label="Copy message">
-          <i data-lucide="copy" style="width: 13px; height: 13px;"></i>
-          <span>Copy</span>
-        </button>
-      </div>
-    `;
-
-    this.setupMessageActionListeners(row, msg);
-    this.conversationContainer.appendChild(row);
-    this.refreshIcons();
-    return row;
-  }
-
-  setupMessageActionListeners(row, msg) {
-    // Copy message action
-    const copyBtn = row.querySelector('.copy-msg');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(msg.content);
-        this.showToast('Copied to clipboard', 'info');
-      });
-    }
-
-    // Toggle reasoning accordion
-    const rHeader = row.querySelector('.reasoning-header');
-    if (rHeader) {
-      rHeader.addEventListener('click', () => {
-        rHeader.closest('.reasoning-box').classList.toggle('collapsed');
-      });
-    }
-
-    // Code block copy buttons
-    row.querySelectorAll('.copy-code-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const code = btn.closest('.code-block-container').querySelector('code').innerText;
-        navigator.clipboard.writeText(code);
-        btn.innerHTML = `<i data-lucide="check" style="width: 12px; height: 12px;"></i> Copied`;
-        this.refreshIcons();
-        setTimeout(() => {
-          btn.innerHTML = `<i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy`;
-          this.refreshIcons();
-        }, 1800);
-      });
-    });
-  }
-
-  renderMarkdown(text) {
-    if (!text) return '';
-    if (window.marked) {
-      const html = marked.parse(text);
-      // Format code blocks
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = html;
-      tempDiv.querySelectorAll('pre').forEach(pre => {
-        const codeEl = pre.querySelector('code');
-        const langClass = codeEl ? codeEl.className : '';
-        const langMatch = langClass.match(/language-(\w+)/);
-        const lang = langMatch ? langMatch[1] : 'code';
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'code-block-container';
-        wrapper.innerHTML = `
-          <div class="code-header">
-            <span>${lang}</span>
-            <button type="button" class="copy-code-btn" aria-label="Copy code">
-              <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
-              <span>Copy</span>
-            </button>
-          </div>
-        `;
-        pre.parentNode.insertBefore(wrapper, pre);
-        wrapper.appendChild(pre);
-      });
-      return tempDiv.innerHTML;
-    }
-    return `<p>${this.escapeHtml(text)}</p>`;
-  }
-
-  scrollToBottom() {
-    this.chatScrollArea.scrollTop = this.chatScrollArea.scrollHeight;
-  }
-
-  escapeHtml(str) {
-    return String(str || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
-  refreshIcons() {
-    if (window.lucide) {
-      window.lucide.createIcons();
-    }
-  }
-
-  showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.innerHTML = `<span>${this.escapeHtml(message)}</span>`;
-    this.toastContainer.appendChild(toast);
-    setTimeout(() => {
-      toast.remove();
-    }, 2800);
+  if (langMode === 'sinhala') {
+    return 'You are oska.AI V1. The user communicates in Sinhala (සිංහල). Respond naturally, politely, and fluently in Sinhala script. Keep technical terms, code variables, library names, and APIs in English.';
+  } else if (langMode === 'singlish') {
+    return 'You are oska.AI V1. The user is communicating in Singlish (Romanized Sinhala, e.g. "mata me code eka explain krnn"). Respond naturally and conversationally in friendly Singlish (Romanized characters). Do NOT convert into formal Sinhala Unicode script unless explicitly requested. Keep code and technical terminology in English.';
+  } else {
+    return 'You are oska.AI V1, a thoughtful, articulate, and helpful AI workspace assistant. Provide clear, direct, and well-formatted answers with natural Markdown formatting.';
   }
 }
 
-// Instantiate on DOM ready
+// -------------------------------------------------------------
+// 5. Universal Document & File Parsers
+// -------------------------------------------------------------
+async function parseUploadedFile(file) {
+  const fileName = file.name;
+  const ext = fileName.split('.').pop().toLowerCase();
+  const fileType = file.type;
+
+  // 1. Images
+  if (fileType.startsWith('image/')) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve({
+          name: fileName,
+          type: 'image',
+          mimeType: fileType,
+          dataUrl: e.target.result,
+          base64: e.target.result.split(',')[1],
+          textContext: `[Uploaded Image: ${fileName}]`
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // 2. PDF Documents
+  if (ext === 'pdf' || fileType === 'application/pdf') {
+    try {
+      if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let extractedText = '';
+        for (let i = 1; i <= Math.min(pdf.numPages, 30); i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(item => item.str).join(' ');
+          extractedText += `\n--- [PDF Page ${i}/${pdf.numPages}] ---\n${pageText}\n`;
+        }
+        return {
+          name: fileName,
+          type: 'pdf',
+          textContext: `Document [${fileName}] Content (${pdf.numPages} pages):\n${extractedText.slice(0, 40000)}`
+        };
+      }
+    } catch (e) {
+      console.warn('PDF parse fallback:', e);
+    }
+  }
+
+  // 3. Word Documents (.docx)
+  if (ext === 'docx') {
+    try {
+      if (typeof mammoth !== 'undefined') {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return {
+          name: fileName,
+          type: 'docx',
+          textContext: `Word Document [${fileName}] Content:\n${result.value.slice(0, 40000)}`
+        };
+      }
+    } catch (e) {
+      console.warn('DOCX parse fallback:', e);
+    }
+  }
+
+  // 4. Spreadsheets (.xlsx, .xls, .csv) with Statistical Summaries
+  if (['xlsx', 'xls', 'csv'].includes(ext)) {
+    try {
+      if (typeof XLSX !== 'undefined') {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        let summaryText = `Spreadsheet [${fileName}] Overview:\n`;
+        let chartableData = null;
+
+        workbook.SheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          if (jsonData.length > 0) {
+            summaryText += `\nSheet: "${sheetName}" (${jsonData.length} rows, ${jsonData[0] ? jsonData[0].length : 0} cols)\n`;
+            // Table preview
+            const previewRows = jsonData.slice(0, 25);
+            summaryText += previewRows.map(row => (Array.isArray(row) ? row.join(' | ') : '')).join('\n') + '\n';
+            if (!chartableData && jsonData.length > 1) {
+              chartableData = { headers: jsonData[0], rows: jsonData.slice(1) };
+            }
+          }
+        });
+
+        return {
+          name: fileName,
+          type: 'spreadsheet',
+          chartData: chartableData,
+          textContext: summaryText
+        };
+      }
+    } catch (e) {
+      console.warn('Spreadsheet parse fallback:', e);
+    }
+  }
+
+  // 5. Code, Markdown, JSON, Text
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      resolve({
+        name: fileName,
+        type: 'text',
+        textContext: `Attached File [${fileName}]:\n\`\`\`${ext}\n${text.slice(0, 40000)}\n\`\`\``
+      });
+    };
+    reader.readAsText(file);
+  });
+}
+
+// -------------------------------------------------------------
+// 6. Persistence & Storage Helpers (Isolated per User)
+// -------------------------------------------------------------
+function getStorageKey() {
+  const uid = state.user ? state.user.uid : 'guest';
+  return `oska_conversations_${uid}`;
+}
+
+function loadSavedConversations() {
+  try {
+    const key = getStorageKey();
+    const saved = localStorage.getItem(key);
+    state.conversations = saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    state.conversations = [];
+  }
+}
+
+function saveConversationsToStorage() {
+  try {
+    const key = getStorageKey();
+    localStorage.setItem(key, JSON.stringify(state.conversations));
+  } catch (e) {
+    console.warn('Storage save notice:', e);
+  }
+}
+
+// -------------------------------------------------------------
+// 7. Initialization & DOM Setup
+// -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-  window.app = new OskaAIApp();
+  // Apply saved theme
+  document.documentElement.setAttribute('data-theme', state.theme);
+  updateThemeIcon();
+
+  // Initialize UI
+  setupAuthListeners();
+  setupUIEventListeners();
+  setupSpeechRecognition();
+  renderModelPopoverList();
+  renderEffortPopoverList();
+  renderConversationsList();
+
+  // Highlight.js
+  if (typeof hljs !== 'undefined') {
+    hljs.configure({ ignoreUnescapedHTML: true });
+  }
+
+  // Lucide icons
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
 });
+
+// -------------------------------------------------------------
+// 8. Authentication Management
+// -------------------------------------------------------------
+function setupAuthListeners() {
+  if (auth) {
+    auth.onAuthStateChanged((user) => {
+      state.user = user;
+      updateUserProfileUI(user);
+      loadSavedConversations();
+      renderConversationsList();
+
+      // Check admin status
+      const adminEmails = ['oshadhaperer@gmail.com', 'cit24010476@gmail.com'];
+      const menuAdminBtn = document.getElementById('menuAdminBtn');
+      if (menuAdminBtn) {
+        menuAdminBtn.style.display = (user && adminEmails.includes(user.email)) ? 'flex' : 'none';
+      }
+    });
+  }
+
+  // Google Sign-In Button
+  const googleSignInBtn = document.getElementById('googleSignInBtn');
+  if (googleSignInBtn) {
+    googleSignInBtn.addEventListener('click', async () => {
+      if (!auth) {
+        showToast('Firebase Auth is ready in client mode');
+        return;
+      }
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await auth.signInWithPopup(provider);
+        hideAllPopovers();
+        document.getElementById('loginModal').classList.add('hidden');
+        showToast('Successfully signed in with Google!');
+      } catch (err) {
+        console.error('Sign-in error:', err);
+        showToast('Google Sign-In notice: ' + (err.message || 'Check popup settings'));
+      }
+    });
+  }
+
+  // Guest Continue Button
+  const guestContinueBtn = document.getElementById('guestContinueBtn');
+  if (guestContinueBtn) {
+    guestContinueBtn.addEventListener('click', () => {
+      document.getElementById('loginModal').classList.add('hidden');
+    });
+  }
+
+  // Sign out
+  const menuSignOutBtn = document.getElementById('menuSignOutBtn');
+  if (menuSignOutBtn) {
+    menuSignOutBtn.addEventListener('click', async () => {
+      if (auth) {
+        await auth.signOut();
+        showToast('Signed out');
+        hideAllPopovers();
+      }
+    });
+  }
+}
+
+function updateUserProfileUI(user) {
+  const userAvatar = document.getElementById('userAvatar');
+  const menuUserAvatar = document.getElementById('menuUserAvatar');
+  const userDisplayName = document.getElementById('userDisplayName');
+  const userEmailText = document.getElementById('userEmailText');
+  const menuUserName = document.getElementById('menuUserName');
+  const menuUserEmail = document.getElementById('menuUserEmail');
+  const menuLoginBtn = document.getElementById('menuLoginBtn');
+  const menuSignOutBtn = document.getElementById('menuSignOutBtn');
+
+  if (user) {
+    const initials = (user.displayName || user.email || 'U').charAt(0).toUpperCase();
+    if (user.photoURL) {
+      userAvatar.innerHTML = `<img src="${user.photoURL}" alt="${user.displayName}">`;
+      menuUserAvatar.innerHTML = `<img src="${user.photoURL}" alt="${user.displayName}">`;
+    } else {
+      userAvatar.textContent = initials;
+      menuUserAvatar.textContent = initials;
+    }
+    userDisplayName.textContent = user.displayName || 'Google User';
+    userEmailText.textContent = user.email || 'Connected';
+    menuUserName.textContent = user.displayName || 'Google User';
+    menuUserEmail.textContent = user.email || '';
+    if (menuLoginBtn) menuLoginBtn.classList.add('hidden');
+    if (menuSignOutBtn) menuSignOutBtn.classList.remove('hidden');
+  } else {
+    userAvatar.textContent = 'G';
+    menuUserAvatar.textContent = 'G';
+    userDisplayName.textContent = 'Guest User';
+    userEmailText.textContent = 'Sign in to save cloud sync';
+    menuUserName.textContent = 'Guest User';
+    menuUserEmail.textContent = 'guest@oska.ai';
+    if (menuLoginBtn) menuLoginBtn.classList.remove('hidden');
+    if (menuSignOutBtn) menuSignOutBtn.classList.add('hidden');
+  }
+}
+
+// -------------------------------------------------------------
+// 9. UI Events & Interactive Control Bindings
+// -------------------------------------------------------------
+function setupUIEventListeners() {
+  const chatInput = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const newChatBtn = document.getElementById('newChatBtn');
+  const headerNewChatBtn = document.getElementById('headerNewChatBtn');
+  const brandHomeBtn = document.getElementById('brandHomeBtn');
+  const attachBtn = document.getElementById('attachBtn');
+  const fileInput = document.getElementById('fileInput');
+  const toolsMenuBtn = document.getElementById('toolsMenuBtn');
+  const composerLangBtn = document.getElementById('composerLangBtn');
+  const composerModelBtn = document.getElementById('composerModelBtn');
+  const composerEffortBtn = document.getElementById('composerEffortBtn');
+  const userProfileBtn = document.getElementById('userProfileBtn');
+  const popoverBackdrop = document.getElementById('popoverBackdrop');
+  const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const openSettingsBtn = document.getElementById('openSettingsBtn');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  const clearAllHistoryBtn = document.getElementById('clearAllHistoryBtn');
+  const menuLoginBtn = document.getElementById('menuLoginBtn');
+  const menuAdminBtn = document.getElementById('menuAdminBtn');
+  const closeAdminBtn = document.getElementById('closeAdminBtn');
+
+  // Input auto-expand & send button toggle
+  chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + 'px';
+    sendBtn.disabled = !chatInput.value.trim() && state.attachments.length === 0;
+  });
+
+  // Enter to send (Shift+Enter for newline)
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!sendBtn.disabled && !state.isGenerating) {
+        handleSendMessage();
+      }
+    }
+  });
+
+  // Global Shortcut Ctrl + K for New Chat
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      createNewConversation();
+    }
+  });
+
+  sendBtn.addEventListener('click', handleSendMessage);
+  stopBtn.addEventListener('click', handleStopGeneration);
+
+  newChatBtn.addEventListener('click', createNewConversation);
+  if (headerNewChatBtn) headerNewChatBtn.addEventListener('click', createNewConversation);
+  brandHomeBtn.addEventListener('click', (e) => { e.preventDefault(); createNewConversation(); });
+
+  // File Attachments
+  attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', handleFileUpload);
+
+  // Tools Popover
+  toolsMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePopover('toolsPopover');
+  });
+
+  // Language Popover
+  composerLangBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePopover('languagePopover');
+  });
+
+  // Language selection buttons
+  document.querySelectorAll('#languagePopoverList [data-lang]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.getAttribute('data-lang');
+      state.responseLanguage = lang;
+      document.getElementById('composerLangLabel').textContent = btn.querySelector('.item-title').textContent.split(' ')[0];
+      document.querySelectorAll('#languagePopoverList [data-lang]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      hideAllPopovers();
+      showToast(`Language set to ${btn.querySelector('.item-title').textContent}`);
+    });
+  });
+
+  // Model & Reasoning Popovers
+  composerModelBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePopover('composerModelPopover');
+  });
+
+  composerEffortBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePopover('composerEffortPopover');
+  });
+
+  userProfileBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePopover('accountPopover');
+  });
+
+  popoverBackdrop.addEventListener('click', hideAllPopovers);
+
+  // Sidebar Toggle (Mobile & Desktop)
+  sidebarToggleBtn.addEventListener('click', () => {
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth <= 768) {
+      sidebar.classList.toggle('mobile-open');
+      sidebarBackdrop.classList.toggle('hidden', !sidebar.classList.contains('mobile-open'));
+    } else {
+      sidebar.classList.toggle('collapsed');
+    }
+  });
+
+  sidebarBackdrop.addEventListener('click', () => {
+    document.getElementById('sidebar').classList.remove('mobile-open');
+    sidebarBackdrop.classList.add('hidden');
+  });
+
+  // Theme Toggle
+  themeToggleBtn.addEventListener('click', () => {
+    state.theme = state.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', state.theme);
+    localStorage.setItem('oska_theme', state.theme);
+    updateThemeIcon();
+  });
+
+  // Settings Modal
+  openSettingsBtn.addEventListener('click', () => {
+    hideAllPopovers();
+    document.getElementById('settingsModal').classList.remove('hidden');
+  });
+  closeSettingsBtn.addEventListener('click', () => document.getElementById('settingsModal').classList.add('hidden'));
+  saveSettingsBtn.addEventListener('click', () => document.getElementById('settingsModal').classList.add('hidden'));
+
+  // Admin Console Modal
+  if (menuAdminBtn) {
+    menuAdminBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      document.getElementById('adminModal').classList.remove('hidden');
+      document.getElementById('metricTotalChats').textContent = state.conversations.length;
+    });
+  }
+  if (closeAdminBtn) {
+    closeAdminBtn.addEventListener('click', () => document.getElementById('adminModal').classList.add('hidden'));
+  }
+
+  // Clear History
+  clearAllHistoryBtn.addEventListener('click', () => {
+    if (confirm('Clear all conversation logs and history?')) {
+      state.conversations = [];
+      saveConversationsToStorage();
+      createNewConversation();
+      document.getElementById('settingsModal').classList.add('hidden');
+      showToast('All conversation history cleared');
+    }
+  });
+
+  if (menuLoginBtn) {
+    menuLoginBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      document.getElementById('loginModal').classList.remove('hidden');
+    });
+  }
+
+  // Workspace Tools buttons
+  setupWorkspaceToolsButtons();
+
+  // Welcome prompt shortcut chips
+  document.querySelectorAll('.shortcut-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const prompt = chip.getAttribute('data-prompt');
+      if (prompt) {
+        document.getElementById('chatInput').value = prompt;
+        document.getElementById('sendBtn').disabled = false;
+        handleSendMessage();
+      }
+    });
+  });
+}
+
+function updateThemeIcon() {
+  const icon = document.getElementById('themeIcon');
+  if (icon) {
+    icon.setAttribute('data-lucide', state.theme === 'light' ? 'moon' : 'sun');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+}
+
+// -------------------------------------------------------------
+// 10. Popover Management
+// -------------------------------------------------------------
+function togglePopover(popoverId) {
+  const popover = document.getElementById(popoverId);
+  const backdrop = document.getElementById('popoverBackdrop');
+  const isHidden = popover.classList.contains('hidden');
+
+  hideAllPopovers();
+
+  if (isHidden) {
+    popover.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+  }
+}
+
+function hideAllPopovers() {
+  document.querySelectorAll('.composer-popover').forEach(p => p.classList.add('hidden'));
+  const backdrop = document.getElementById('popoverBackdrop');
+  if (backdrop) backdrop.classList.add('hidden');
+}
+
+// -------------------------------------------------------------
+// 11. Model & Reasoning Popover Renderers
+// -------------------------------------------------------------
+function renderModelPopoverList() {
+  const container = document.getElementById('modelPopoverList');
+  if (!container) return;
+
+  container.innerHTML = DEFAULT_MODELS.map(model => `
+    <button type="button" class="popover-item ${model.id === state.selectedModel ? 'active' : ''}" data-model-id="${model.id}">
+      <div class="popover-item-left">
+        <div>
+          <div class="item-title">${model.name}</div>
+          <div class="item-desc">${model.tag}</div>
+        </div>
+      </div>
+      <span class="check-icon">✓</span>
+    </button>
+  `).join('');
+
+  container.querySelectorAll('.popover-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const modelId = btn.getAttribute('data-model-id');
+      selectModel(modelId);
+      hideAllPopovers();
+    });
+  });
+}
+
+function selectModel(modelId) {
+  state.selectedModel = modelId;
+  const model = DEFAULT_MODELS.find(m => m.id === modelId) || DEFAULT_MODELS[0];
+  document.getElementById('composerModelLabel').textContent = model.name;
+  renderModelPopoverList();
+  showToast(`Active model: ${model.name}`);
+}
+
+function renderEffortPopoverList() {
+  const container = document.getElementById('effortPopoverList');
+  if (!container) return;
+
+  container.innerHTML = Object.entries(REASONING_EFFORT_CONFIG).map(([effortKey, config]) => `
+    <button type="button" class="popover-item ${effortKey === state.reasoningEffort ? 'active' : ''}" data-effort-key="${effortKey}">
+      <div class="popover-item-left">
+        <div>
+          <div class="item-title">${config.label}</div>
+          <div class="item-desc">${config.desc}</div>
+        </div>
+      </div>
+      <span class="check-icon">✓</span>
+    </button>
+  `).join('');
+
+  container.querySelectorAll('.popover-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const effortKey = btn.getAttribute('data-effort-key');
+      selectEffort(effortKey);
+      hideAllPopovers();
+    });
+  });
+}
+
+function selectEffort(effortKey) {
+  state.reasoningEffort = effortKey;
+  const config = REASONING_EFFORT_CONFIG[effortKey] || REASONING_EFFORT_CONFIG['medium'];
+  document.getElementById('composerEffortLabel').textContent = config.label;
+  renderEffortPopoverList();
+  showToast(`Reasoning effort: ${config.label}`);
+}
+
+// -------------------------------------------------------------
+// 12. Workspace Tools & Media Generators
+// -------------------------------------------------------------
+function setupWorkspaceToolsButtons() {
+  const toolWebSearchBtn = document.getElementById('toolWebSearchBtn');
+  const toolResearchBtn = document.getElementById('toolResearchBtn');
+  const toolDataAnalysisBtn = document.getElementById('toolDataAnalysisBtn');
+  const toolCreateImageBtn = document.getElementById('toolCreateImageBtn');
+  const toolCreateVideoBtn = document.getElementById('toolCreateVideoBtn');
+
+  if (toolWebSearchBtn) {
+    toolWebSearchBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      const input = document.getElementById('chatInput');
+      input.value = `/search ${input.value}`.trim() + ' ';
+      input.focus();
+      showToast('Web Search Mode activated');
+    });
+  }
+
+  if (toolResearchBtn) {
+    toolResearchBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      const input = document.getElementById('chatInput');
+      input.value = `/research ${input.value}`.trim() + ' ';
+      input.focus();
+      showToast('Deep Research Mode activated');
+    });
+  }
+
+  if (toolDataAnalysisBtn) {
+    toolDataAnalysisBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      document.getElementById('fileInput').click();
+      showToast('Attach an Excel, CSV, or document for Data Analysis');
+    });
+  }
+
+  if (toolCreateImageBtn) {
+    toolCreateImageBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      const input = document.getElementById('chatInput');
+      input.value = `/image a serene minimalist architectural studio in Kyoto during sunset, 8k cinematic lighting`;
+      input.focus();
+      document.getElementById('sendBtn').disabled = false;
+      showToast('Image Generation Prompt prepared');
+    });
+  }
+
+  if (toolCreateVideoBtn) {
+    toolCreateVideoBtn.addEventListener('click', () => {
+      hideAllPopovers();
+      const input = document.getElementById('chatInput');
+      input.value = `/video smooth drone flyover of mist-covered pine mountains at dawn`;
+      input.focus();
+      document.getElementById('sendBtn').disabled = false;
+      showToast('AI Video Prompt prepared');
+    });
+  }
+}
+
+// -------------------------------------------------------------
+// 13. File Upload Handler & Attachment Bar
+// -------------------------------------------------------------
+async function handleFileUpload(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  showToast(`Processing ${files.length} file(s)...`);
+
+  for (const file of files) {
+    const parsed = await parseUploadedFile(file);
+    state.attachments.push(parsed);
+  }
+
+  renderAttachmentBar();
+  document.getElementById('sendBtn').disabled = false;
+  e.target.value = '';
+}
+
+function renderAttachmentBar() {
+  const bar = document.getElementById('attachmentPreviewBar');
+  if (!state.attachments.length) {
+    bar.classList.add('hidden');
+    bar.innerHTML = '';
+    return;
+  }
+
+  bar.classList.remove('hidden');
+  bar.innerHTML = state.attachments.map((att, idx) => `
+    <div class="attachment-chip">
+      ${att.type === 'image' ? `<img src="${att.dataUrl}" class="chip-thumb" alt="${att.name}">` : `<i data-lucide="file-text" style="width: 14px; height: 14px;"></i>`}
+      <span class="chip-name">${att.name}</span>
+      <button type="button" class="chip-remove" onclick="removeAttachment(${idx})">
+        <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+      </button>
+    </div>
+  `).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+window.removeAttachment = function(idx) {
+  state.attachments.splice(idx, 1);
+  renderAttachmentBar();
+  const input = document.getElementById('chatInput');
+  document.getElementById('sendBtn').disabled = !input.value.trim() && state.attachments.length === 0;
+};
+
+// -------------------------------------------------------------
+// 14. Voice Recognition (Speech to Text)
+// -------------------------------------------------------------
+function setupSpeechRecognition() {
+  const micBtn = document.getElementById('voiceMicBtn');
+  const badge = document.getElementById('voiceWaveformBadge');
+  if (!micBtn) return;
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    micBtn.style.display = 'none';
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    micBtn.classList.add('listening');
+    if (badge) badge.classList.remove('hidden');
+  };
+
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    const input = document.getElementById('chatInput');
+    input.value = transcript;
+    input.dispatchEvent(new Event('input'));
+  };
+
+  recognition.onend = () => {
+    micBtn.classList.remove('listening');
+    if (badge) badge.classList.add('hidden');
+  };
+
+  recognition.onerror = () => {
+    micBtn.classList.remove('listening');
+    if (badge) badge.classList.add('hidden');
+  };
+
+  micBtn.addEventListener('click', () => {
+    if (micBtn.classList.contains('listening')) {
+      recognition.stop();
+    } else {
+      try {
+        recognition.start();
+      } catch (err) {
+        console.warn('Speech recognition notice:', err);
+      }
+    }
+  });
+}
+
+// -------------------------------------------------------------
+// 15. Conversation Management & Rendering
+// -------------------------------------------------------------
+function createNewConversation() {
+  state.activeConversationId = null;
+  state.attachments = [];
+  renderAttachmentBar();
+
+  const welcomeScreen = document.getElementById('welcomeScreen');
+  const container = document.getElementById('conversationContainer');
+  const title = document.getElementById('headerChatTitle');
+
+  welcomeScreen.classList.remove('hidden');
+  container.classList.add('hidden');
+  container.innerHTML = '';
+  title.textContent = 'New chat';
+
+  document.getElementById('chatInput').value = '';
+  document.getElementById('chatInput').focus();
+  document.getElementById('sendBtn').disabled = true;
+
+  document.querySelectorAll('.chat-item').forEach(item => item.classList.remove('active'));
+}
+
+function renderConversationsList() {
+  const listContainer = document.getElementById('sidebarHistory');
+  if (!listContainer) return;
+
+  if (!state.conversations.length) {
+    listContainer.innerHTML = `<div style="padding: 1.5rem 0.5rem; text-align: center; color: var(--text-muted); font-size: 0.8rem;">No conversations yet</div>`;
+    return;
+  }
+
+  listContainer.innerHTML = `
+    <div class="history-group-title">Recent Chats</div>
+    ${state.conversations.map(conv => `
+      <div class="chat-item ${conv.id === state.activeConversationId ? 'active' : ''}" data-conv-id="${conv.id}">
+        <span class="chat-item-title">${escapeHtml(conv.title || 'Conversation')}</span>
+        <div class="chat-item-actions">
+          <button type="button" class="chat-action-btn delete" onclick="event.stopPropagation(); deleteConversation('${conv.id}')" title="Delete">
+            <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+          </button>
+        </div>
+      </div>
+    `).join('')}
+  `;
+
+  listContainer.querySelectorAll('.chat-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const convId = item.getAttribute('data-conv-id');
+      loadConversation(convId);
+    });
+  });
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function loadConversation(convId) {
+  const conv = state.conversations.find(c => c.id === convId);
+  if (!conv) return;
+
+  state.activeConversationId = convId;
+  document.getElementById('headerChatTitle').textContent = conv.title || 'Conversation';
+  document.getElementById('welcomeScreen').classList.add('hidden');
+  const container = document.getElementById('conversationContainer');
+  container.classList.remove('hidden');
+  container.innerHTML = '';
+
+  conv.messages.forEach(msg => {
+    appendMessageToDOM(msg.role, msg.content, msg.reasoning, msg.media, msg.citations, msg.chart);
+  });
+
+  renderConversationsList();
+  scrollChatToBottom();
+}
+
+window.deleteConversation = function(convId) {
+  state.conversations = state.conversations.filter(c => c.id !== convId);
+  saveConversationsToStorage();
+  if (state.activeConversationId === convId) {
+    createNewConversation();
+  } else {
+    renderConversationsList();
+  }
+  showToast('Conversation deleted');
+};
+
+// -------------------------------------------------------------
+// 16. Chat Streaming & Execution Flow
+// -------------------------------------------------------------
+async function handleSendMessage() {
+  const input = document.getElementById('chatInput');
+  const prompt = input.value.trim();
+  const currentAttachments = [...state.attachments];
+
+  if (!prompt && !currentAttachments.length) return;
+  if (state.isGenerating) return;
+
+  // Clear composer
+  input.value = '';
+  input.style.height = 'auto';
+  state.attachments = [];
+  renderAttachmentBar();
+  document.getElementById('sendBtn').disabled = true;
+
+  // Ensure active conversation
+  let conv = state.conversations.find(c => c.id === state.activeConversationId);
+  if (!conv) {
+    conv = {
+      id: 'conv_' + Date.now(),
+      title: prompt.slice(0, 32) || 'Document Analysis',
+      createdAt: new Date().toISOString(),
+      messages: []
+    };
+    state.conversations.unshift(conv);
+    state.activeConversationId = conv.id;
+  }
+
+  // Switch from welcome screen
+  document.getElementById('welcomeScreen').classList.add('hidden');
+  document.getElementById('conversationContainer').classList.remove('hidden');
+  document.getElementById('headerChatTitle').textContent = conv.title;
+
+  // Format prompt with attached context
+  let finalUserPrompt = prompt;
+  let hasSpreadsheet = false;
+  let chartData = null;
+
+  if (currentAttachments.length) {
+    const fileContexts = currentAttachments.map(att => {
+      if (att.chartData) {
+        hasSpreadsheet = true;
+        chartData = att.chartData;
+      }
+      return att.textContext || `[Attached: ${att.name}]`;
+    }).join('\n\n');
+    finalUserPrompt = `${prompt}\n\n[FILE CONTEXT]:\n${fileContexts}`.trim();
+  }
+
+  // Render User Message
+  conv.messages.push({ role: 'user', content: prompt, attachments: currentAttachments.map(a => a.name) });
+  appendMessageToDOM('user', prompt, null, null, null, null);
+  saveConversationsToStorage();
+  renderConversationsList();
+
+  // Create Assistant Message Placeholder
+  const assistantBubbleId = 'msg_' + Date.now();
+  const assistantRow = appendMessageToDOM('assistant', '', '', null, null, null, assistantBubbleId);
+  const bubbleContent = assistantRow.querySelector('.message-bubble');
+
+  // Toggle generating state
+  setGeneratingState(true);
+
+  // 1. Handle Slash Commands (/image, /video)
+  if (prompt.startsWith('/image ')) {
+    await handleImageGeneration(prompt.replace('/image ', ''), bubbleContent, conv);
+    setGeneratingState(false);
+    return;
+  }
+
+  if (prompt.startsWith('/video ')) {
+    await handleVideoGeneration(prompt.replace('/video ', ''), bubbleContent, conv);
+    setGeneratingState(false);
+    return;
+  }
+
+  // 2. Multilingual System Prompt Preparation
+  const systemPrompt = buildLanguageSystemPrompt(prompt, state.responseLanguage);
+
+  // 3. API Streaming Request
+  state.abortController = new AbortController();
+
+  try {
+    const messagesPayload = [
+      { role: 'system', content: systemPrompt },
+      ...conv.messages.slice(-8).map(m => ({ role: m.role, content: m.content }))
+    ];
+
+    // Check for inline images
+    const imageAttachment = currentAttachments.find(a => a.type === 'image');
+    let inlineImage = imageAttachment ? { mimeType: imageAttachment.mimeType, base64: imageAttachment.base64 } : null;
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: messagesPayload,
+        model: state.selectedModel,
+        reasoningEffort: state.reasoningEffort,
+        inlineImage: inlineImage,
+        stream: true
+      }),
+      signal: state.abortController.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(`API returned status ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let assistantText = '';
+    let reasoningText = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') continue;
+          try {
+            const data = JSON.parse(raw);
+            if (data.type === 'text') {
+              assistantText += data.content;
+              updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+            } else if (data.type === 'reasoning') {
+              reasoningText += data.content;
+              updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+            }
+          } catch (e) {
+            // raw text fallback
+            assistantText += raw;
+            updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText);
+          }
+        }
+      }
+      scrollChatToBottom();
+    }
+
+    // Interactive Chart Generation for Spreadsheets
+    let generatedChart = null;
+    if (hasSpreadsheet && chartData && (prompt.toLowerCase().includes('chart') || prompt.toLowerCase().includes('graph') || prompt.toLowerCase().includes('visualize') || prompt.toLowerCase().includes('revenue'))) {
+      generatedChart = renderSpreadsheetChart(bubbleContent, chartData);
+    }
+
+    conv.messages.push({
+      role: 'assistant',
+      content: assistantText,
+      reasoning: reasoningText,
+      chart: generatedChart
+    });
+
+    saveConversationsToStorage();
+
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      showToast('Generation stopped');
+    } else {
+      console.error('Chat error:', err);
+      bubbleContent.innerHTML = `<p style="color: #ef4444;">⚠️ Connection interrupted: ${escapeHtml(err.message || 'Check model availability')}</p>`;
+    }
+  } finally {
+    setGeneratingState(false);
+  }
+}
+
+function handleStopGeneration() {
+  if (state.abortController) {
+    state.abortController.abort();
+    state.abortController = null;
+  }
+  setGeneratingState(false);
+}
+
+function setGeneratingState(isGenerating) {
+  state.isGenerating = isGenerating;
+  const sendBtn = document.getElementById('sendBtn');
+  const stopBtn = document.getElementById('stopBtn');
+
+  if (isGenerating) {
+    sendBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
+  } else {
+    sendBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
+    const input = document.getElementById('chatInput');
+    sendBtn.disabled = !input.value.trim() && state.attachments.length === 0;
+  }
+}
+
+// -------------------------------------------------------------
+// 17. Image & Video Generation Handlers
+// -------------------------------------------------------------
+async function handleImageGeneration(prompt, bubbleElement, conv) {
+  bubbleElement.innerHTML = `<p>🎨 <em>Creating high-resolution visual for: "${escapeHtml(prompt)}"...</em></p>`;
+  try {
+    const res = await fetch('/api/images/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    if (data.imageUrl) {
+      bubbleElement.innerHTML = `
+        <p>Generated image for: <strong>${escapeHtml(prompt)}</strong></p>
+        <div class="ai-media-card">
+          <img src="${data.imageUrl}" alt="${escapeHtml(prompt)}">
+          <div class="ai-media-footer">
+            <span>oska.AI Diffusion Engine</span>
+            <a href="${data.imageUrl}" target="_blank" download="oska-image.png" class="media-action-btn">
+              <i data-lucide="download" style="width: 12px; height: 12px;"></i> Download
+            </a>
+          </div>
+        </div>
+      `;
+      conv.messages.push({ role: 'assistant', content: `Generated image for: ${prompt}`, media: { type: 'image', url: data.imageUrl } });
+      saveConversationsToStorage();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  } catch (err) {
+    bubbleElement.innerHTML = `<p style="color: #ef4444;">Image generation notice: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function handleVideoGeneration(prompt, bubbleElement, conv) {
+  bubbleElement.innerHTML = `<p>🎬 <em>Generating cinematic motion shot for: "${escapeHtml(prompt)}"...</em></p>`;
+  try {
+    const res = await fetch('/api/videos/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    if (data.videoUrl) {
+      bubbleElement.innerHTML = `
+        <p>Generated cinematic shot for: <strong>${escapeHtml(prompt)}</strong></p>
+        <div class="ai-media-card">
+          <img src="${data.videoUrl}" alt="${escapeHtml(prompt)}">
+          <div class="ai-media-footer">
+            <span>oska.AI Motion Engine · 1080p Cinematic</span>
+            <a href="${data.videoUrl}" target="_blank" class="media-action-btn">
+              <i data-lucide="play" style="width: 12px; height: 12px;"></i> Full Preview
+            </a>
+          </div>
+        </div>
+      `;
+      conv.messages.push({ role: 'assistant', content: `Generated video for: ${prompt}`, media: { type: 'video', url: data.videoUrl } });
+      saveConversationsToStorage();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  } catch (err) {
+    bubbleElement.innerHTML = `<p style="color: #ef4444;">Video generation notice: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+// -------------------------------------------------------------
+// 18. DOM Rendering & Chart Creation
+// -------------------------------------------------------------
+function appendMessageToDOM(role, content, reasoning, media, citations, chart, rowId) {
+  const container = document.getElementById('conversationContainer');
+  const row = document.createElement('div');
+  row.className = `message-row ${role}`;
+  if (rowId) row.id = rowId;
+
+  let renderedHTML = '';
+
+  // 1. Reasoning Accordion
+  if (reasoning) {
+    renderedHTML += `
+      <div class="reasoning-box">
+        <div class="reasoning-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span>💭 Thought Process & Reasoning</span>
+          <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+        </div>
+        <div class="reasoning-content">${escapeHtml(reasoning)}</div>
+      </div>
+    `;
+  }
+
+  // 2. Main Content Markdown
+  renderedHTML += renderMarkdown(content);
+
+  // 3. Media Card
+  if (media && media.url) {
+    renderedHTML += `
+      <div class="ai-media-card">
+        <img src="${media.url}" alt="AI generated content">
+      </div>
+    `;
+  }
+
+  row.innerHTML = `
+    <div class="message-bubble">${renderedHTML}</div>
+    <div class="message-actions">
+      <button type="button" class="msg-action-btn" onclick="copyMessageText(this)" title="Copy message">
+        <i data-lucide="copy" style="width: 13px; height: 13px;"></i> Copy
+      </button>
+    </div>
+  `;
+
+  container.appendChild(row);
+  scrollChatToBottom();
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  return row;
+}
+
+function updateAssistantMessageDOM(bubbleElement, text, reasoning) {
+  let html = '';
+  if (reasoning) {
+    html += `
+      <div class="reasoning-box">
+        <div class="reasoning-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span>💭 Thinking (${reasoning.length} chars)</span>
+          <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+        </div>
+        <div class="reasoning-content">${escapeHtml(reasoning)}</div>
+      </div>
+    `;
+  }
+  html += renderMarkdown(text);
+  bubbleElement.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function renderSpreadsheetChart(bubbleElement, chartData) {
+  try {
+    const chartId = 'chart_' + Date.now();
+    const chartCard = document.createElement('div');
+    chartCard.className = 'ai-chart-card';
+    chartCard.innerHTML = `
+      <div class="ai-chart-header">
+        <i data-lucide="bar-chart-2" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+        <span>Interactive Data Visualization</span>
+      </div>
+      <div class="chart-canvas-wrapper">
+        <canvas id="${chartId}"></canvas>
+      </div>
+    `;
+    bubbleElement.appendChild(chartCard);
+
+    // Extract first 10 rows for chart
+    const labels = chartData.rows.slice(0, 8).map(r => String(r[0] || ''));
+    const values = chartData.rows.slice(0, 8).map(r => Number(r[1]) || 0);
+
+    setTimeout(() => {
+      const ctx = document.getElementById(chartId);
+      if (ctx && typeof Chart !== 'undefined') {
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: chartData.headers[1] || 'Values',
+              data: values,
+              backgroundColor: 'rgba(194, 65, 12, 0.7)',
+              borderColor: '#c2410c',
+              borderWidth: 1,
+              borderRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true } }
+          }
+        });
+      }
+    }, 100);
+
+    return true;
+  } catch (e) {
+    console.warn('Chart render notice:', e);
+    return false;
+  }
+}
+
+// -------------------------------------------------------------
+// 19. Markdown & Code Block Formatter
+// -------------------------------------------------------------
+function renderMarkdown(content) {
+  if (!content) return '';
+  if (typeof marked !== 'undefined') {
+    return marked.parse(content);
+  }
+  return `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>`;
+}
+
+window.copyMessageText = function(btn) {
+  const bubble = btn.closest('.message-row').querySelector('.message-bubble');
+  const text = bubble ? bubble.innerText : '';
+  navigator.clipboard.writeText(text);
+  showToast('Copied to clipboard');
+};
+
+function scrollChatToBottom() {
+  const area = document.getElementById('chatScrollArea');
+  if (area) {
+    area.scrollTop = area.scrollHeight;
+  }
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// -------------------------------------------------------------
+// 20. Toast Notifications
+// -------------------------------------------------------------
+function showToast(message) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `<i data-lucide="check" style="width: 14px; height: 14px;"></i> <span>${escapeHtml(message)}</span>`;
+  container.appendChild(toast);
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 200);
+  }, 2800);
+}
