@@ -182,12 +182,29 @@ function switchAdminGoogleAccount() {
 // -------------------------------------------------------------
 function setupPinInputHandlers() {
   const inputs = document.querySelectorAll('.pin-digit');
+  const errorBox = document.getElementById('gateCodeError');
 
   inputs.forEach((input, index) => {
     input.addEventListener('input', (e) => {
-      const val = e.target.value;
+      let val = e.target.value;
+      if (val.length > 1) {
+        val = val.slice(-1);
+        e.target.value = val;
+      }
+
+      if (errorBox) errorBox.classList.add('hidden');
+
       if (val && index < inputs.length - 1) {
         inputs[index + 1].focus();
+      }
+
+      // Check if all 6 digits are filled
+      let fullCode = '';
+      inputs.forEach(inp => fullCode += inp.value);
+      if (fullCode.length === 6) {
+        setTimeout(() => {
+          document.getElementById('adminPinForm')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }, 80);
       }
     });
 
@@ -200,11 +217,15 @@ function setupPinInputHandlers() {
     input.addEventListener('paste', (e) => {
       e.preventDefault();
       const paste = (e.clipboardData || window.clipboardData).getData('text').trim();
-      if (/^\d{6}$/.test(paste)) {
-        paste.split('').forEach((char, i) => {
+      const digits = paste.replace(/\D/g, '').slice(0, 6);
+      if (digits.length === 6) {
+        digits.split('').forEach((char, i) => {
           if (inputs[i]) inputs[i].value = char;
         });
         if (inputs[5]) inputs[5].focus();
+        setTimeout(() => {
+          document.getElementById('adminPinForm')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }, 80);
       }
     });
   });

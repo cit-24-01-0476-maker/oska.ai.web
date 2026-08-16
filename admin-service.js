@@ -36,8 +36,8 @@ function isAllowedAdminEmail(email) {
 
 const ADMIN_ALLOWED_EMAIL = (process.env.ADMIN_ALLOWED_EMAIL || 'oshadhaperera500@gmail.com').trim().toLowerCase();
 
-// Default fallback hash (scrypt of 849201) if ADMIN_ACCESS_CODE_HASH is not yet set in environment
-const DEFAULT_CODE_HASH = 'scrypt$fe1a1c8c5dd4122d192e4098c6436cef$d2f17798ad15472af8e1b6f4381762f403d81d8eae452d29f1625e45611aa2c5fd577cb5ff065ab152b5bb7fcddbed45580d3d0e06c14a6b7de538b38b8a720e';
+// Default fallback hash (scrypt of 672810) if ADMIN_ACCESS_CODE_HASH is not yet set in environment
+const DEFAULT_CODE_HASH = 'scrypt$157bfa12fc9182b2c1e2f3e7a1174a8c$74a694235314d8c95fe079f74958fed849850a0d5624f4c02c611d34ce861d943e222bd296776930058457e04436a094e45409286ee1cd51665abb6370843560';
 const ADMIN_ACCESS_CODE_HASH = (process.env.ADMIN_ACCESS_CODE_HASH || DEFAULT_CODE_HASH).trim();
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes idle timeout
