@@ -39,14 +39,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupSidebarNavigation();
   setupMobileDrawer();
 
-  try {
-    await initAdminFirebase();
-  } catch (err) {
-    console.error('Firebase init error:', err);
+  // CRITICAL: Check existing admin session token FIRST (before Firebase)
+  // This prevents the onAuthStateChanged callback from resetting the UI
+  const hasSession = await checkExistingAdminSession();
+  
+  if (!hasSession) {
+    // Only initialize Firebase auth if no active session
+    try {
+      await initAdminFirebase();
+    } catch (err) {
+      console.error('Firebase init error:', err);
+    }
   }
-
-  // Check active admin session cookie
-  await checkExistingAdminSession();
 });
 
 // -------------------------------------------------------------
@@ -304,6 +308,9 @@ async function adminFetch(url, options = {}) {
 }
 
 async function checkExistingAdminSession() {
+  const token = localStorage.getItem('oska_admin_token');
+  if (!token) return false;
+
   try {
     const res = await adminFetch('/api/admin/session');
     if (res.ok) {
@@ -312,9 +319,15 @@ async function checkExistingAdminSession() {
         adminState.authenticated = true;
         adminState.verifiedEmail = data.email;
         enterCommandCenter({ email: data.email, name: data.email.split('@')[0] });
+        return true;
       }
     }
-  } catch (_) {}
+    // Token invalid — clean up
+    localStorage.removeItem('oska_admin_token');
+    return false;
+  } catch (_) {
+    return false;
+  }
 }
 
 function enterCommandCenter(adminInfo) {

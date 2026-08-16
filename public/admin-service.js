@@ -258,30 +258,36 @@ function createAdminSession(uid, email) {
 function requireAdminAccess(req) {
   let token = null;
 
-  // 1. Check Cookie
-  const cookieHeader = req.headers.cookie || '';
-  const match = cookieHeader.match(/oska_admin_session=([^;]+)/);
-  if (match) {
-    token = match[1].trim();
-  }
-
-  // 2. Check Authorization Header
-  if (!token && req.headers.authorization) {
+  // 1. Check Authorization Header FIRST (most reliable on Vercel)
+  if (req.headers.authorization) {
     const authParts = req.headers.authorization.split(' ');
     if (authParts.length === 2 && (authParts[0] === 'Bearer' || authParts[0] === 'AdminSession')) {
       token = authParts[1].trim();
     }
   }
 
-  if (!token) return null;
+  // 2. Fallback to Cookie
+  if (!token) {
+    const cookieHeader = req.headers.cookie || '';
+    const match = cookieHeader.match(/oska_admin_session=([^;]+)/);
+    if (match) {
+      token = decodeURIComponent(match[1]).trim();
+    }
+  }
 
-  // Validate Signed Token
-  const parts = token.split('.');
-  if (parts.length === 2) {
-    const [dataStr, sig] = parts;
+  if (!token || token.length < 10) return null;
+
+  // Validate HMAC Signed Token (stateless — works across Vercel cold starts)
+  const dotIdx = token.indexOf('.');
+  if (dotIdx > 0 && dotIdx < token.length - 1) {
+    const dataStr = token.substring(0, dotIdx);
+    const sig = token.substring(dotIdx + 1);
     try {
       const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(dataStr).digest('base64url');
-      if (crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+      // Safe comparison: convert both to hex of fixed length for timingSafeEqual
+      const sigBuf = crypto.createHash('sha256').update(sig).digest();
+      const expectedBuf = crypto.createHash('sha256').update(expectedSig).digest();
+      if (crypto.timingSafeEqual(sigBuf, expectedBuf)) {
         const payload = JSON.parse(Buffer.from(dataStr, 'base64url').toString('utf8'));
         if (payload.expiresAt && payload.expiresAt > Date.now() && isAllowedAdminEmail(payload.email)) {
           return {
@@ -292,15 +298,19 @@ function requireAdminAccess(req) {
           };
         }
       }
-    } catch (_) {}
+    } catch (err) {
+      // Token parse error — fall through
+    }
   }
 
   // Fallback to in-memory check
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const session = adminSessions.get(tokenHash);
-  if (session && Date.now() < session.expiresAt && isAllowedAdminEmail(session.email)) {
-    return session;
-  }
+  try {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const session = adminSessions.get(tokenHash);
+    if (session && Date.now() < session.expiresAt && isAllowedAdminEmail(session.email)) {
+      return session;
+    }
+  } catch (_) {}
 
   return null;
 }
@@ -642,10 +652,16 @@ async function handleAdminRequest(pathname, req, res, getRequestBody) {
   if (pathname === '/api/admin/lock' || pathname === '/api/admin/signout') {
     const session = requireAdminAccess(req);
     if (session) {
-      adminSessions.delete(session.tokenHash);
       recordAudit(pathname === '/api/admin/lock' ? 'ADMIN_LOCKED' : 'ADMIN_SIGNED_OUT', session.email, 'SESSION', session.id);
     }
-    res.setHeader('Set-Cookie', 'oska_admin_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0;');
+    // Clear all in-memory sessions for this email
+    for (const [hash, sess] of adminSessions.entries()) {
+      if (session && sess.email === session.email) {
+        adminSessions.delete(hash);
+      }
+    }
+    const isProd = process.env.NODE_ENV === 'production' || req.headers['x-forwarded-proto'] === 'https';
+    res.setHeader('Set-Cookie', `oska_admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; ${isProd ? 'Secure;' : ''}`);
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ success: true, message: 'Admin locked' }));

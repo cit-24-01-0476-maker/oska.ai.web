@@ -2988,7 +2988,33 @@ function sendPresenceHeartbeat() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
+  }).then(res => res.ok ? res.json() : null).then(data => {
+    if (data && typeof data.maintenanceEnabled !== 'undefined') {
+      handleMaintenanceState(data.maintenanceEnabled);
+    }
   }).catch(() => {});
+}
+
+function handleMaintenanceState(isEnabled) {
+  const overlay = document.getElementById('maintenanceOverlay');
+  const chatInput = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  if (isEnabled) {
+    if (overlay) overlay.classList.remove('hidden');
+    if (chatInput) {
+      chatInput.disabled = true;
+      chatInput.placeholder = 'oska.AI is under scheduled maintenance...';
+    }
+    if (sendBtn) sendBtn.disabled = true;
+  } else {
+    if (overlay) overlay.classList.add('hidden');
+    if (chatInput && chatInput.disabled) {
+      chatInput.disabled = false;
+      chatInput.placeholder = window.innerWidth <= 768 ? 'Message oska.AI…' : 'Message oska.AI... (Shift + Enter for new line)';
+    }
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 function initClientPresence() {
