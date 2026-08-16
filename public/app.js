@@ -853,69 +853,131 @@ function selectEffort(effortKey) {
 }
 
 // -------------------------------------------------------------
-// 13. Workspace Tools & Media Generators (Auth-Protected)
+// 13. Workspace Tools System (Normalized Catalog & Active Mode)
 // -------------------------------------------------------------
+const WORKSPACE_TOOLS = [
+  {
+    id: 'web-search',
+    name: 'Web Search',
+    description: 'Live search with real source citations',
+    icon: 'globe',
+    placeholder: 'Search the web and ask anything… (Shift + Enter for new line)',
+    statusMsg: 'Searching the web…'
+  },
+  {
+    id: 'deep-research',
+    name: 'Deep Research',
+    description: 'Multi-source structured investigation',
+    icon: 'book-open-check',
+    placeholder: 'Enter research question or topic for in-depth investigation…',
+    statusMsg: 'Researching sources…'
+  },
+  {
+    id: 'data-analysis',
+    name: 'Data & Chart Analysis',
+    description: 'Interactive stats and visualization',
+    icon: 'line-chart',
+    placeholder: 'Ask questions, calculate metrics, or visualize attached data…',
+    statusMsg: 'Analyzing your data…'
+  },
+  {
+    id: 'image-generation',
+    name: 'Create Image',
+    description: 'Generate visuals with AI',
+    icon: 'image',
+    placeholder: 'Describe the image you want to create in detail…',
+    statusMsg: 'Creating your image…'
+  },
+  {
+    id: 'video-generation',
+    name: 'Generate AI Video',
+    description: 'Create cinematic motion shots',
+    icon: 'video',
+    placeholder: 'Describe the video scene you want to generate…',
+    statusMsg: 'Generating your video…'
+  }
+];
+
+function selectWorkspaceTool(toolId) {
+  if (!requireAuth()) return;
+
+  if (state.activeTool === toolId) {
+    state.activeTool = null;
+    showToast('Standard chat mode restored');
+  } else {
+    state.activeTool = toolId;
+    const tool = WORKSPACE_TOOLS.find(t => t.id === toolId);
+    showToast(`${tool ? tool.name : 'Tool'} mode activated`);
+    if (toolId === 'data-analysis' && state.attachments.length === 0) {
+      const fileInput = document.getElementById('fileInput');
+      if (fileInput) fileInput.click();
+    }
+  }
+
+  renderActiveToolBar();
+  renderToolsMenuState();
+  hideAllPopovers();
+}
+
+function renderActiveToolBar() {
+  const bar = document.getElementById('activeToolBar');
+  const input = document.getElementById('chatInput');
+  if (!bar) return;
+
+  if (!state.activeTool) {
+    bar.classList.add('hidden');
+    bar.innerHTML = '';
+    if (input) input.placeholder = 'Message oska.AI... (Shift + Enter for new line)';
+    return;
+  }
+
+  const tool = WORKSPACE_TOOLS.find(t => t.id === state.activeTool);
+  if (!tool) return;
+
+  bar.classList.remove('hidden');
+  bar.innerHTML = `
+    <div class="active-tool-chip">
+      <i data-lucide="${tool.icon}" style="width: 13px; height: 13px;"></i>
+      <span>${tool.name}</span>
+      <button type="button" class="tool-chip-remove" onclick="removeActiveTool()" title="Deactivate tool">
+        <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+      </button>
+    </div>
+  `;
+
+  if (input) {
+    input.placeholder = tool.placeholder;
+    input.focus();
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+window.removeActiveTool = function() {
+  state.activeTool = null;
+  renderActiveToolBar();
+  renderToolsMenuState();
+  showToast('Standard chat mode restored');
+};
+
+function renderToolsMenuState() {
+  document.querySelectorAll('#toolsPopover .popover-item').forEach(btn => {
+    const toolId = btn.getAttribute('data-tool-id');
+    btn.classList.toggle('active', toolId === state.activeTool);
+  });
+}
+
 function setupWorkspaceToolsButtons() {
-  const toolWebSearchBtn = document.getElementById('toolWebSearchBtn');
-  const toolResearchBtn = document.getElementById('toolResearchBtn');
-  const toolDataAnalysisBtn = document.getElementById('toolDataAnalysisBtn');
-  const toolCreateImageBtn = document.getElementById('toolCreateImageBtn');
-  const toolCreateVideoBtn = document.getElementById('toolCreateVideoBtn');
-
-  if (toolWebSearchBtn) {
-    toolWebSearchBtn.addEventListener('click', () => {
-      hideAllPopovers();
-      if (!requireAuth()) return;
-      const input = document.getElementById('chatInput');
-      input.value = `/search ${input.value}`.trim() + ' ';
-      input.focus();
-      showToast('Web Search Mode activated');
-    });
-  }
-
-  if (toolResearchBtn) {
-    toolResearchBtn.addEventListener('click', () => {
-      hideAllPopovers();
-      if (!requireAuth()) return;
-      const input = document.getElementById('chatInput');
-      input.value = `/research ${input.value}`.trim() + ' ';
-      input.focus();
-      showToast('Deep Research Mode activated');
-    });
-  }
-
-  if (toolDataAnalysisBtn) {
-    toolDataAnalysisBtn.addEventListener('click', () => {
-      hideAllPopovers();
-      if (!requireAuth()) return;
-      document.getElementById('fileInput').click();
-      showToast('Attach an Excel, CSV, or document for Data Analysis');
-    });
-  }
-
-  if (toolCreateImageBtn) {
-    toolCreateImageBtn.addEventListener('click', () => {
-      hideAllPopovers();
-      if (!requireAuth()) return;
-      const input = document.getElementById('chatInput');
-      input.value = `/image a serene minimalist architectural studio in Kyoto during sunset, 8k cinematic lighting`;
-      input.focus();
-      document.getElementById('sendBtn').disabled = false;
-      showToast('Image Generation Prompt prepared');
-    });
-  }
-
-  if (toolCreateVideoBtn) {
-    toolCreateVideoBtn.addEventListener('click', () => {
-      hideAllPopovers();
-      if (!requireAuth()) return;
-      const input = document.getElementById('chatInput');
-      input.value = `/video smooth drone flyover of mist-covered pine mountains at dawn`;
-      input.focus();
-      document.getElementById('sendBtn').disabled = false;
-      showToast('AI Video Prompt prepared');
-    });
-  }
+  document.querySelectorAll('#toolsPopover .popover-item').forEach(btn => {
+    const toolId = btn.getAttribute('data-tool-id');
+    if (toolId) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectWorkspaceTool(toolId);
+      });
+    }
+  });
 }
 
 // -------------------------------------------------------------
@@ -1134,7 +1196,7 @@ async function handleSendMessage() {
   if (!prompt && !currentAttachments.length) return;
   if (state.isGenerating) return;
 
-  // 1. Strict Auth Gate: If unauthenticated, open login modal and PRESERVE the prompt in chatInput!
+  // 1. Strict Auth Gate: If unauthenticated, open login modal and PRESERVE prompt!
   if (!requireAuth()) {
     return;
   }
@@ -1191,7 +1253,7 @@ async function handleSendMessage() {
   const assistantRow = appendMessageToDOM('assistant', '', '', null, null, null, assistantBubbleId);
   const bubbleContent = assistantRow.querySelector('.message-bubble');
 
-  // Determine initial contextual status based on prompt, attachments, and effort
+  // Determine initial contextual status based on prompt, attachments, effort, and active tool
   const initialStatus = getContextualStatus(prompt, currentAttachments, state.reasoningEffort);
 
   // Show the thinking indicator immediately
@@ -1199,18 +1261,20 @@ async function handleSendMessage() {
   setGeneratingState(true);
   state.generationPhase = 'queued';
 
-  // Handle Slash Commands (/image, /video)
-  if (prompt.startsWith('/image ')) {
+  // Handle Active Media Tools & Slash Commands (/image, /video)
+  if (state.activeTool === 'image-generation' || prompt.startsWith('/image ')) {
+    const imgPrompt = prompt.replace(/^\/image\s+/i, '').trim() || 'Modern artistic composition with soft lighting';
     updateThinkingStatus(bubbleContent, 'Creating your image…');
-    await handleImageGeneration(prompt.replace('/image ', ''), bubbleContent, conv);
+    await handleImageGeneration(imgPrompt, bubbleContent, conv);
     state.generationPhase = 'completed';
     setGeneratingState(false);
     return;
   }
 
-  if (prompt.startsWith('/video ')) {
+  if (state.activeTool === 'video-generation' || prompt.startsWith('/video ')) {
+    const vidPrompt = prompt.replace(/^\/video\s+/i, '').trim() || 'Cinematic nature landscape';
     updateThinkingStatus(bubbleContent, 'Generating your video…');
-    await handleVideoGeneration(prompt.replace('/video ', ''), bubbleContent, conv);
+    await handleVideoGeneration(vidPrompt, bubbleContent, conv);
     state.generationPhase = 'completed';
     setGeneratingState(false);
     return;
@@ -1223,6 +1287,7 @@ async function handleSendMessage() {
   state.abortController = new AbortController();
   let assistantText = '';
   let reasoningText = '';
+  let currentCitations = [];
   let streamStarted = false;
   const timeoutId = setTimeout(() => {
     if (state.abortController) {
@@ -1258,6 +1323,7 @@ async function handleSendMessage() {
         model: state.selectedModel,
         reasoningEffort: state.reasoningEffort,
         inlineImage: inlineImage,
+        tool: state.activeTool,
         stream: true
       }),
       signal: state.abortController.signal
@@ -1278,10 +1344,11 @@ async function handleSendMessage() {
       const json = await response.json();
       assistantText = json.choices?.[0]?.message?.content || json.content || '';
       reasoningText = json.choices?.[0]?.message?.reasoning_content || json.reasoning || '';
+      currentCitations = json.citations || [];
       transitionToStreaming(bubbleContent);
       streamStarted = true;
       state.generationPhase = 'streaming';
-      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true);
+      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true, currentCitations);
       scrollChatToBottom();
     } else {
       // SSE Streaming Reader
@@ -1315,10 +1382,23 @@ async function handleSendMessage() {
                   updateThinkingStatus(bubbleContent, 'Reading the file…');
                 } else if (data.status === 'analyzing-data') {
                   updateThinkingStatus(bubbleContent, 'Analyzing the data…');
+                } else if (data.status === 'research.planning') {
+                  updateThinkingStatus(bubbleContent, 'Planning research queries…');
+                } else if (data.status === 'research.searching') {
+                  updateThinkingStatus(bubbleContent, 'Gathering multi-source evidence…');
+                } else if (data.status === 'research.synthesizing') {
+                  updateThinkingStatus(bubbleContent, 'Synthesizing investigation report…');
                 } else if (data.status === 'streaming' && !streamStarted) {
                   transitionToStreaming(bubbleContent);
                   streamStarted = true;
                 }
+                continue;
+              }
+
+              // Handle real citations event
+              if (data.type === 'citations') {
+                currentCitations = data.citations || [];
+                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true, currentCitations);
                 continue;
               }
 
@@ -1329,10 +1409,9 @@ async function handleSendMessage() {
                   state.generationPhase = 'streaming';
                 }
                 assistantText += data.content;
-                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true);
+                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true, currentCitations);
               } else if (data.type === 'reasoning') {
                 reasoningText += data.content;
-                // Don't expose reasoning to UI, but store it
               }
             } catch (e) {
               if (!streamStarted) {
@@ -1341,7 +1420,7 @@ async function handleSendMessage() {
                 state.generationPhase = 'streaming';
               }
               assistantText += raw;
-              updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true);
+              updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true, currentCitations);
             }
           } else if (line.trim() && !line.startsWith(':')) {
             try {
@@ -1353,7 +1432,7 @@ async function handleSendMessage() {
                   state.generationPhase = 'streaming';
                 }
                 assistantText = data.choices[0].message.content;
-                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true);
+                updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, true, currentCitations);
               }
             } catch (_) {}
           }
@@ -1365,15 +1444,14 @@ async function handleSendMessage() {
     if (!assistantText.trim()) {
       assistantText = 'I am ready to assist with your questions, code, and analysis.';
       if (!streamStarted) transitionToStreaming(bubbleContent);
-      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false);
+      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false, currentCitations);
     } else {
-      // Remove streaming cursor from final message
-      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false);
+      updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false, currentCitations);
     }
 
-    // Chart Generation for Spreadsheets
+    // Chart Generation for Spreadsheets or Data Analysis
     let generatedChart = null;
-    if (hasSpreadsheet && chartData && (prompt.toLowerCase().includes('chart') || prompt.toLowerCase().includes('graph') || prompt.toLowerCase().includes('visualize') || prompt.toLowerCase().includes('revenue'))) {
+    if (hasSpreadsheet && chartData) {
       generatedChart = renderSpreadsheetChart(bubbleContent, chartData);
     }
 
@@ -1381,6 +1459,7 @@ async function handleSendMessage() {
       role: 'assistant',
       content: assistantText,
       reasoning: reasoningText,
+      citations: currentCitations,
       chart: generatedChart
     });
 
@@ -1396,7 +1475,7 @@ async function handleSendMessage() {
       if (!streamStarted || !assistantText.trim()) {
         showThinkingError(bubbleContent, 'Request timed out or was cancelled.', prompt);
       } else {
-        updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false);
+        updateAssistantMessageDOM(bubbleContent, assistantText, reasoningText, false, currentCitations);
       }
     } else {
       state.generationPhase = 'failed';
@@ -1441,18 +1520,15 @@ function setGeneratingState(isGenerating) {
 // 17b. oska.AI Premium Thinking Indicator System
 // -------------------------------------------------------------
 
-/**
- * Determine the initial contextual status label based on prompt content,
- * attachments, and reasoning effort. Uses REAL context, not fake timers.
- */
 function getContextualStatus(prompt, attachments, effort) {
   const p = prompt.toLowerCase();
 
-  // Slash commands
-  if (p.startsWith('/search ') || p.startsWith('/web ')) return 'Searching the web…';
-  if (p.startsWith('/research ')) return 'Researching sources…';
-  if (p.startsWith('/image ')) return 'Creating your image…';
-  if (p.startsWith('/video ')) return 'Generating your video…';
+  // Active Tool Status
+  if (state.activeTool === 'web-search' || p.startsWith('/search ') || p.startsWith('/web ')) return 'Searching the web…';
+  if (state.activeTool === 'deep-research' || p.startsWith('/research ')) return 'Researching sources…';
+  if (state.activeTool === 'data-analysis') return 'Analyzing your data…';
+  if (state.activeTool === 'image-generation' || p.startsWith('/image ')) return 'Creating your image…';
+  if (state.activeTool === 'video-generation' || p.startsWith('/video ')) return 'Generating your video…';
 
   // Attachment-based status
   if (attachments.length > 0) {
@@ -1479,10 +1555,6 @@ function getContextualStatus(prompt, attachments, effort) {
   return 'Thinking…';
 }
 
-/**
- * Render the oska.AI thinking indicator inside the assistant bubble.
- * This replaces the empty bubble content with the branded indicator.
- */
 function showThinkingIndicator(bubbleElement, statusText) {
   const useShimmer = state.reasoningEffort !== 'instant';
   bubbleElement.innerHTML = `
@@ -1496,9 +1568,6 @@ function showThinkingIndicator(bubbleElement, statusText) {
   `;
 }
 
-/**
- * Smoothly update the thinking status label with a fade transition.
- */
 function updateThinkingStatus(bubbleElement, newStatus) {
   const label = bubbleElement.querySelector('.oska-thinking-label');
   if (!label) return;
@@ -1511,10 +1580,6 @@ function updateThinkingStatus(bubbleElement, newStatus) {
   }, 180);
 }
 
-/**
- * Transition from thinking indicator to streaming content.
- * Dissolves the indicator, then shows the response mark + content area.
- */
 function transitionToStreaming(bubbleElement) {
   const indicator = bubbleElement.querySelector('#oskaThinkingIndicator');
   if (indicator) {
@@ -1525,9 +1590,6 @@ function transitionToStreaming(bubbleElement) {
   }
 }
 
-/**
- * Show an error state where the thinking indicator was, with a Retry button.
- */
 function showThinkingError(bubbleElement, message, originalPrompt) {
   bubbleElement.innerHTML = `
     <div class="oska-thinking">
@@ -1540,32 +1602,25 @@ function showThinkingError(bubbleElement, message, originalPrompt) {
   `;
 }
 
-/** Retry the last user message */
 window.retryLastMessage = function() {
   const conv = state.conversations.find(c => c.id === state.activeConversationId);
   if (!conv || conv.messages.length === 0) return;
 
-  // Find the last user message
   const lastUserMsg = [...conv.messages].reverse().find(m => m.role === 'user');
   if (!lastUserMsg) return;
 
-  // Remove the failed assistant message from DOM (last .message-row.assistant)
   const container = document.getElementById('conversationContainer');
   const lastAssistantRow = container?.querySelector('.message-row.assistant:last-child');
   if (lastAssistantRow) lastAssistantRow.remove();
 
-  // Remove the failed assistant message from conversation data (if it exists)
   if (conv.messages[conv.messages.length - 1]?.role === 'assistant') {
     conv.messages.pop();
   }
-  // Also remove the user message so handleSendMessage re-adds it
   conv.messages.pop();
 
-  // Remove the user message row from DOM
   const lastUserRow = container?.querySelector('.message-row.user:last-child');
   if (lastUserRow) lastUserRow.remove();
 
-  // Re-send
   const input = document.getElementById('chatInput');
   input.value = lastUserMsg.content;
   handleSendMessage();
@@ -1575,7 +1630,16 @@ window.retryLastMessage = function() {
 // 18. Image & Video Generation Handlers
 // -------------------------------------------------------------
 async function handleImageGeneration(prompt, bubbleElement, conv) {
-  bubbleElement.innerHTML = `<p>🎨 <em>Creating high-resolution visual for: "${escapeHtml(prompt)}"...</em></p>`;
+  bubbleElement.innerHTML = `
+    <div class="oska-thinking">
+      <div class="oska-thinking-mark">🎨</div>
+      <div class="oska-thinking-status shimmer">
+        <span class="oska-thinking-label">Creating your image…</span>
+        <span class="oska-thinking-dots"><span></span><span></span><span></span></span>
+      </div>
+    </div>
+  `;
+
   try {
     const res = await fetch('/api/images/generate', {
       method: 'POST',
@@ -1586,20 +1650,26 @@ async function handleImageGeneration(prompt, bubbleElement, conv) {
       body: JSON.stringify({ prompt })
     });
     const data = await res.json();
-    if (data.imageUrl) {
+    if (data.url) {
       bubbleElement.innerHTML = `
+        <div class="oska-response-mark">🎨</div>
         <p>Generated image for: <strong>${escapeHtml(prompt)}</strong></p>
         <div class="ai-media-card">
-          <img src="${data.imageUrl}" alt="${escapeHtml(prompt)}">
+          <img src="${data.url}" alt="${escapeHtml(prompt)}" class="generated-img" onclick="window.open('${data.url}', '_blank')">
           <div class="ai-media-footer">
-            <span>oska.AI Diffusion Engine</span>
-            <a href="${data.imageUrl}" target="_blank" download="oska-image.png" class="media-action-btn">
-              <i data-lucide="download" style="width: 12px; height: 12px;"></i> Download
-            </a>
+            <span>FLUX.1 Diffusion Engine · 1024×1024</span>
+            <div class="media-actions-group">
+              <button type="button" class="media-action-btn" onclick="useImageAsAttachment('${data.url}', '${escapeHtml(prompt)}')">
+                <i data-lucide="paperclip" style="width: 12px; height: 12px;"></i> Use as Attachment
+              </button>
+              <a href="${data.url}" target="_blank" download="oska-image.png" class="media-action-btn">
+                <i data-lucide="download" style="width: 12px; height: 12px;"></i> Download
+              </a>
+            </div>
           </div>
         </div>
       `;
-      conv.messages.push({ role: 'assistant', content: `Generated image for: ${prompt}`, media: { type: 'image', url: data.imageUrl } });
+      conv.messages.push({ role: 'assistant', content: `Generated image for: ${prompt}`, media: { type: 'image', url: data.url } });
       saveConversationsToStorage();
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -1608,8 +1678,28 @@ async function handleImageGeneration(prompt, bubbleElement, conv) {
   }
 }
 
+window.useImageAsAttachment = function(url, prompt) {
+  state.attachments.push({
+    name: `oska_image_${Date.now()}.png`,
+    type: 'image',
+    dataUrl: url,
+    textContext: `[Attached Previous AI Generated Image: "${prompt}"]`
+  });
+  renderAttachmentBar();
+  showToast('Image attached to composer for follow-up refinement');
+};
+
 async function handleVideoGeneration(prompt, bubbleElement, conv) {
-  bubbleElement.innerHTML = `<p>🎬 <em>Generating cinematic motion shot for: "${escapeHtml(prompt)}"...</em></p>`;
+  bubbleElement.innerHTML = `
+    <div class="oska-thinking">
+      <div class="oska-thinking-mark">🎬</div>
+      <div class="oska-thinking-status shimmer">
+        <span class="oska-thinking-label">Generating cinematic video…</span>
+        <span class="oska-thinking-dots"><span></span><span></span><span></span></span>
+      </div>
+    </div>
+  `;
+
   try {
     const res = await fetch('/api/videos/generate', {
       method: 'POST',
@@ -1620,20 +1710,23 @@ async function handleVideoGeneration(prompt, bubbleElement, conv) {
       body: JSON.stringify({ prompt })
     });
     const data = await res.json();
-    if (data.videoUrl) {
+    if (data.previewUrl) {
       bubbleElement.innerHTML = `
-        <p>Generated cinematic shot for: <strong>${escapeHtml(prompt)}</strong></p>
+        <div class="oska-response-mark">🎬</div>
+        <p>Generated cinematic motion shot for: <strong>${escapeHtml(prompt)}</strong></p>
         <div class="ai-media-card">
-          <img src="${data.videoUrl}" alt="${escapeHtml(prompt)}">
+          <img src="${data.previewUrl}" alt="${escapeHtml(prompt)}" class="generated-video-thumb">
           <div class="ai-media-footer">
-            <span>oska.AI Motion Engine · 1080p Cinematic</span>
-            <a href="${data.videoUrl}" target="_blank" class="media-action-btn">
-              <i data-lucide="play" style="width: 12px; height: 12px;"></i> Full Preview
-            </a>
+            <span>oska.AI Motion Engine · 1280×720</span>
+            <div class="media-actions-group">
+              <a href="${data.previewUrl}" target="_blank" download="oska-motion.jpg" class="media-action-btn">
+                <i data-lucide="download" style="width: 12px; height: 12px;"></i> Download Shot
+              </a>
+            </div>
           </div>
         </div>
       `;
-      conv.messages.push({ role: 'assistant', content: `Generated video for: ${prompt}`, media: { type: 'video', url: data.videoUrl } });
+      conv.messages.push({ role: 'assistant', content: `Generated video shot for: ${prompt}`, media: { type: 'video', url: data.previewUrl } });
       saveConversationsToStorage();
       if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -1643,8 +1736,32 @@ async function handleVideoGeneration(prompt, bubbleElement, conv) {
 }
 
 // -------------------------------------------------------------
-// 19. DOM Rendering & Chart Creation
+// 19. Source Cards, Markdown, & Chart Creation
 // -------------------------------------------------------------
+function renderSourceCards(citations) {
+  if (!citations || !Array.isArray(citations) || citations.length === 0) return '';
+  return `
+    <div class="sources-container">
+      <div class="sources-header">
+        <i data-lucide="compass" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+        <span>Verified Web Sources (${citations.length})</span>
+      </div>
+      <div class="sources-grid">
+        ${citations.map((c, idx) => `
+          <a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="source-card" title="${escapeHtml(c.title || c.url)}">
+            <div class="source-card-badge">${idx + 1}</div>
+            <div class="source-card-info">
+              <div class="source-card-title">${escapeHtml(c.title || c.domain)}</div>
+              <div class="source-card-domain">${escapeHtml(c.domain || 'web')}</div>
+            </div>
+            <i data-lucide="external-link" style="width: 12px; height: 12px;" class="source-card-ext"></i>
+          </a>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function appendMessageToDOM(role, content, reasoning, media, citations, chart, rowId) {
   const container = document.getElementById('conversationContainer');
   const row = document.createElement('div');
@@ -1666,6 +1783,10 @@ function appendMessageToDOM(role, content, reasoning, media, citations, chart, r
   }
 
   renderedHTML += renderMarkdown(content);
+
+  if (citations && citations.length > 0) {
+    renderedHTML += renderSourceCards(citations);
+  }
 
   if (media && media.url) {
     renderedHTML += `
@@ -1691,7 +1812,7 @@ function appendMessageToDOM(role, content, reasoning, media, citations, chart, r
   return row;
 }
 
-function updateAssistantMessageDOM(bubbleElement, text, reasoning, isStreaming) {
+function updateAssistantMessageDOM(bubbleElement, text, reasoning, isStreaming, citations) {
   let html = '';
 
   // Small oska.AI mark at top of response
@@ -1711,11 +1832,14 @@ function updateAssistantMessageDOM(bubbleElement, text, reasoning, isStreaming) 
 
   html += '<div class="oska-stream-content">';
   html += renderMarkdown(text);
-  // Show streaming cursor while actively streaming
   if (isStreaming) {
     html += '<span class="oska-stream-cursor"></span>';
   }
   html += '</div>';
+
+  if (citations && citations.length > 0) {
+    html += renderSourceCards(citations);
+  }
 
   bubbleElement.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -1726,10 +1850,22 @@ function renderSpreadsheetChart(bubbleElement, chartData) {
     const chartId = 'chart_' + Date.now();
     const chartCard = document.createElement('div');
     chartCard.className = 'ai-chart-card';
+
+    const labels = chartData.rows.slice(0, 10).map(r => String(r[0] || ''));
+    const values = chartData.rows.slice(0, 10).map(r => Number(r[1]) || 0);
+    const labelTitle = chartData.headers[1] || chartData.headers[0] || 'Metrics';
+
     chartCard.innerHTML = `
       <div class="ai-chart-header">
-        <i data-lucide="bar-chart-2" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
-        <span>Interactive Data Visualization</span>
+        <div class="ai-chart-header-left">
+          <i data-lucide="bar-chart-2" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+          <span>Data Visualization · ${escapeHtml(labelTitle)}</span>
+        </div>
+        <div class="ai-chart-controls">
+          <button type="button" class="chart-btn active" onclick="switchChartType('${chartId}', 'bar', this)">Bar</button>
+          <button type="button" class="chart-btn" onclick="switchChartType('${chartId}', 'line', this)">Line</button>
+          <button type="button" class="chart-btn" onclick="switchChartType('${chartId}', 'doughnut', this)">Donut</button>
+        </div>
       </div>
       <div class="chart-canvas-wrapper">
         <canvas id="${chartId}"></canvas>
@@ -1737,29 +1873,28 @@ function renderSpreadsheetChart(bubbleElement, chartData) {
     `;
     bubbleElement.appendChild(chartCard);
 
-    const labels = chartData.rows.slice(0, 8).map(r => String(r[0] || ''));
-    const values = chartData.rows.slice(0, 8).map(r => Number(r[1]) || 0);
-
     setTimeout(() => {
       const ctx = document.getElementById(chartId);
       if (ctx && typeof Chart !== 'undefined') {
-        new Chart(ctx, {
+        window['chart_instance_' + chartId] = new Chart(ctx, {
           type: 'bar',
           data: {
             labels: labels,
             datasets: [{
-              label: chartData.headers[1] || 'Values',
+              label: labelTitle,
               data: values,
-              backgroundColor: 'rgba(194, 65, 12, 0.7)',
+              backgroundColor: 'rgba(194, 65, 12, 0.75)',
               borderColor: '#c2410c',
-              borderWidth: 1,
+              borderWidth: 1.5,
               borderRadius: 4
             }]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: true } }
+            plugins: {
+              legend: { display: true }
+            }
           }
         });
       }
@@ -1771,6 +1906,20 @@ function renderSpreadsheetChart(bubbleElement, chartData) {
     return false;
   }
 }
+
+window.switchChartType = function(chartId, newType, btn) {
+  const instance = window['chart_instance_' + chartId];
+  if (!instance) return;
+
+  instance.config.type = newType;
+  instance.update();
+
+  const container = btn.closest('.ai-chart-controls');
+  if (container) {
+    container.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+};
 
 // -------------------------------------------------------------
 // 20. Markdown & Code Block Formatter

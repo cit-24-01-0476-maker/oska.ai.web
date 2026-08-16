@@ -225,52 +225,58 @@
 
         <!-- Tools Menu Popover -->
         <div class="composer-popover hidden" id="toolsPopover" role="menu" aria-label="Workspace Tools">
+          <div class="popover-sheet-handle hidden"></div>
           <div class="popover-header">WORKSPACE TOOLS</div>
           <div class="popover-scroll-list">
-            <button type="button" class="popover-item" id="toolWebSearchBtn">
+            <button type="button" class="popover-item" id="toolWebSearchBtn" data-tool-id="web-search">
               <div class="popover-item-left">
-                <i data-lucide="globe" style="width: 15px; height: 15px;"></i>
+                <i data-lucide="globe" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
                 <div>
                   <div class="item-title">Web Search</div>
                   <div class="item-desc">Live search with real source citations</div>
                 </div>
               </div>
+              <span class="check-icon">✓</span>
             </button>
-            <button type="button" class="popover-item" id="toolResearchBtn">
+            <button type="button" class="popover-item" id="toolResearchBtn" data-tool-id="deep-research">
               <div class="popover-item-left">
-                <i data-lucide="book-open-check" style="width: 15px; height: 15px;"></i>
+                <i data-lucide="book-open-check" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
                 <div>
                   <div class="item-title">Deep Research</div>
                   <div class="item-desc">Multi-source structured investigation</div>
                 </div>
               </div>
+              <span class="check-icon">✓</span>
             </button>
-            <button type="button" class="popover-item" id="toolDataAnalysisBtn">
+            <button type="button" class="popover-item" id="toolDataAnalysisBtn" data-tool-id="data-analysis">
               <div class="popover-item-left">
-                <i data-lucide="line-chart" style="width: 15px; height: 15px;"></i>
+                <i data-lucide="line-chart" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
                 <div>
                   <div class="item-title">Data & Chart Analysis</div>
                   <div class="item-desc">Interactive stats and visualization</div>
                 </div>
               </div>
+              <span class="check-icon">✓</span>
             </button>
-            <button type="button" class="popover-item" id="toolCreateImageBtn">
+            <button type="button" class="popover-item" id="toolCreateImageBtn" data-tool-id="image-generation">
               <div class="popover-item-left">
-                <i data-lucide="image" style="width: 15px; height: 15px;"></i>
+                <i data-lucide="image" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
                 <div>
                   <div class="item-title">Create Image</div>
                   <div class="item-desc">Generate visuals with AI</div>
                 </div>
               </div>
+              <span class="check-icon">✓</span>
             </button>
-            <button type="button" class="popover-item" id="toolCreateVideoBtn">
+            <button type="button" class="popover-item" id="toolCreateVideoBtn" data-tool-id="video-generation">
               <div class="popover-item-left">
-                <i data-lucide="video" style="width: 15px; height: 15px;"></i>
+                <i data-lucide="video" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
                 <div>
                   <div class="item-title">Generate AI Video</div>
                   <div class="item-desc">Create cinematic motion shots</div>
                 </div>
               </div>
+              <span class="check-icon">✓</span>
             </button>
           </div>
         </div>
@@ -319,6 +325,9 @@
         </div>
 
         <div class="composer-box" id="composerBox">
+          <!-- Active Tool Indicator Bar -->
+          <div class="active-tool-bar hidden" id="activeToolBar"></div>
+
           <!-- Attachment Preview Bar -->
           <div class="attachment-preview-bar hidden" id="attachmentPreviewBar"></div>
 
