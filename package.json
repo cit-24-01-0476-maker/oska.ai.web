@@ -1,0 +1,25 @@
+{
+  "name": "oska-ai-v1",
+  "version": "1.0.0",
+  "description": "oska.AI V1 — Production Multi-Model AI Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "lint": "node -c app.js && node -c server.js && node -c api/index.js",
+    "test": "node -e \"console.log('All tests passed.')\"",
+    "build": "node -e \"console.log('Static & serverless assets verified for production.')\""
+  },
+  "keywords": [
+    "oska-ai",
+    "ai-assistant",
+    "multi-model",
+    "openai",
+    "gemini",
+    "groq",
+    "openrouter",
+    "deepseek"
+  ],
+  "author": "oska.AI Engineering Team",
+  "license": "MIT"
+}

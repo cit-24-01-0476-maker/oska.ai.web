@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>oska.AI V1</title>
+  <meta name="description" content="oska.AI V1 — Production-grade multi-model conversational AI platform.">
+  
+  <!-- Typography & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Highlight.js & Marked -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop hidden" id="sidebarBackdrop"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="#" class="brand" id="brandHomeBtn" aria-label="oska.AI Home">
+          <div class="brand-icon">O</div>
+          <span class="brand-name">oska.AI</span>
+          <span class="brand-badge">V1</span>
+        </a>
+      </div>
+
+      <div class="new-chat-wrapper">
+        <button type="button" class="new-chat-btn" id="newChatBtn" aria-label="New chat">
+          <div class="btn-left">
+            <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+            <span>New chat</span>
+          </div>
+          <span class="new-chat-shortcut">Ctrl K</span>
+        </button>
+      </div>
+
+      <!-- Search input -->
+      <div class="sidebar-search-box">
+        <div class="search-input-wrapper">
+          <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+          <input type="text" class="sidebar-search-input" id="sidebarSearchInput" placeholder="Search conversations..." aria-label="Search conversations">
+        </div>
+      </div>
+
+      <!-- Grouped Conversation History (Pinned, Today, Yesterday, Previous 7 days, Older) -->
+      <div class="sidebar-history" id="sidebarHistory" role="navigation" aria-label="Chat History">
+        <!-- Dynamically rendered -->
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <button type="button" class="footer-btn" id="openSettingsBtn" aria-label="Settings">
+          <i data-lucide="settings" style="width: 16px; height: 16px;"></i>
+          <span>Settings</span>
+        </button>
+        <button type="button" class="footer-btn" id="themeToggleBtn" title="Toggle theme" aria-label="Toggle theme">
+          <i data-lucide="moon" style="width: 16px; height: 16px;" id="themeIcon"></i>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-workspace">
+      <!-- Clean Minimal Header -->
+      <header class="workspace-header">
+        <div class="header-left">
+          <button type="button" class="sidebar-toggle-btn header-action-btn" id="sidebarToggleBtn" title="Toggle sidebar" aria-label="Toggle sidebar">
+            <i data-lucide="panel-left" style="width: 17px; height: 17px;"></i>
+          </button>
+          <span class="header-chat-title" id="headerChatTitle">New chat</span>
+        </div>
+
+        <div class="header-right">
+          <!-- Voice Recognition Microphone & Live Waveform Indicator -->
+          <div class="voice-header-wrapper">
+            <button type="button" class="header-action-btn voice-mic-btn" id="voiceMicBtn" title="Voice Input" aria-label="Voice input">
+              <i data-lucide="mic" style="width: 17px; height: 17px;"></i>
+            </button>
+            <div class="voice-waveform-badge hidden" id="voiceWaveformBadge" title="Listening...">
+              <span class="pulse-dot"></span>
+              <div class="wave-bars">
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- New Chat / Compose Button -->
+          <button type="button" class="header-action-btn compose-btn" id="headerNewChatBtn" title="New conversation" aria-label="New conversation">
+            <i data-lucide="square-pen" style="width: 17px; height: 17px;"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Chat Scroll View -->
+      <div class="chat-scroll-area" id="chatScrollArea">
+        <!-- Welcome Screen (Default empty state) -->
+        <div class="welcome-screen" id="welcomeScreen">
+          <div class="welcome-mark">O</div>
+          <h1 class="welcome-greeting" id="welcomeGreeting">What would you like to explore today?</h1>
+          <p class="welcome-subtext">Ask questions, write code, analyze files, or create with oska.AI.</p>
+
+          <div class="welcome-shortcuts">
+            <button type="button" class="shortcut-chip" data-prompt="Draft a clean REST API in Node.js with error handling">
+              <i data-lucide="code" style="width: 14px; height: 14px;"></i>
+              <span>Build an API</span>
+            </button>
+            <button type="button" class="shortcut-chip" data-prompt="Explain how transformer attention mechanisms work mathematically">
+              <i data-lucide="brain" style="width: 14px; height: 14px;"></i>
+              <span>Explain Concept</span>
+            </button>
+            <button type="button" class="shortcut-chip" data-prompt="Help me brainstorm 5 unique product concepts for AI automation">
+              <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+              <span>Brainstorm Ideas</span>
+            </button>
+            <button type="button" class="shortcut-chip" data-prompt="Analyze this code and suggest performance optimizations:">
+              <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
+              <span>Debug & Optimize</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Dynamic Conversation Stream -->
+        <div class="conversation-container hidden" id="conversationContainer"></div>
+      </div>
+
+      <!-- Claude-Inspired Floating Chat Composer -->
+      <div class="composer-container">
+        <div class="composer-box" id="composerBox">
+          <!-- Attachment Preview Bar -->
+          <div class="attachment-preview-bar hidden" id="attachmentPreviewBar"></div>
+
+          <!-- Multiline Textarea -->
+          <textarea 
+            id="chatInput" 
+            placeholder="Message oska.AI... (Shift + Enter for new line)" 
+            rows="1"
+            aria-label="Message input"
+          ></textarea>
+
+          <!-- Composer Toolbar -->
+          <div class="composer-toolbar">
+            <div class="composer-tools-left">
+              <!-- File Attachment Button -->
+              <input type="file" id="fileInput" multiple style="display: none;">
+              <button type="button" class="composer-btn" id="attachBtn" title="Attach files or images" aria-label="Attach files">
+                <i data-lucide="paperclip" style="width: 15px; height: 15px;"></i>
+                <span class="btn-label-desktop">Attach</span>
+              </button>
+
+              <!-- Tools Menu Popover Trigger -->
+              <button type="button" class="composer-btn" id="toolsMenuBtn" title="Workspace Tools" aria-label="Tools">
+                <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
+                <span class="btn-label-desktop">Tools</span>
+              </button>
+            </div>
+
+            <div class="composer-actions-right">
+              <!-- Interactive Model Selector Button -->
+              <button type="button" class="composer-control-pill" id="composerModelBtn" title="Select AI Model" aria-haspopup="true" aria-expanded="false" aria-label="Select AI Model">
+                <span class="control-label" id="composerModelLabel">Gemini 3.7 Flash</span>
+                <i data-lucide="chevron-down" style="width: 13px; height: 13px;" class="chevron-icon"></i>
+              </button>
+
+              <!-- Interactive Reasoning Effort Selector Button -->
+              <button type="button" class="composer-control-pill" id="composerEffortBtn" title="Select Reasoning Effort" aria-haspopup="true" aria-expanded="false" aria-label="Select Reasoning Effort">
+                <span class="control-label" id="composerEffortLabel">Extra High</span>
+                <i data-lucide="chevron-down" style="width: 13px; height: 13px;" class="chevron-icon"></i>
+              </button>
+
+              <!-- Send & Stop Generation Buttons -->
+              <button type="button" class="send-btn" id="sendBtn" title="Send message (Enter)" aria-label="Send message" disabled>
+                <i data-lucide="arrow-up" style="width: 16px; height: 16px;"></i>
+              </button>
+              <button type="button" class="stop-btn hidden" id="stopBtn" title="Stop generation" aria-label="Stop generation">
+                <i data-lucide="square" style="width: 14px; height: 14px;"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="composer-disclaimer">oska.AI may generate inaccurate information. Verify critical details.</div>
+      </div>
+    </main>
+
+    <!-- Generic Popover Backdrop for Mobile / Outside-Click -->
+    <div class="popover-backdrop hidden" id="popoverBackdrop"></div>
+
+    <!-- Direct Model Picker Popover (Opens Directly Above Model Button) -->
+    <div class="composer-popover hidden" id="composerModelPopover" role="menu" aria-label="Select AI Model">
+      <div class="popover-header">AI MODELS</div>
+      <div class="popover-scroll-list" id="modelPopoverList">
+        <!-- Dynamically rendered -->
+      </div>
+    </div>
+
+    <!-- Direct Reasoning Effort Popover (Opens Directly Above Reasoning Button) -->
+    <div class="composer-popover hidden" id="composerEffortPopover" role="menu" aria-label="Select Reasoning Effort">
+      <div class="popover-header">REASONING EFFORT</div>
+      <div class="popover-scroll-list" id="effortPopoverList">
+        <!-- Dynamically rendered -->
+      </div>
+    </div>
+
+    <!-- Tools Menu Popover (Opens Upward from Composer Tools Button) -->
+    <div class="composer-popover hidden" id="toolsPopover" role="menu" aria-label="Workspace Tools">
+      <div class="popover-header">WORKSPACE TOOLS</div>
+      <div class="popover-scroll-list">
+        <button type="button" class="popover-item" id="toolWebSearchBtn">
+          <div class="popover-item-left">
+            <i data-lucide="globe" style="width: 15px; height: 15px;"></i>
+            <div>
+              <div class="item-title">Web Search</div>
+              <div class="item-desc">Search real-time web intelligence</div>
+            </div>
+          </div>
+        </button>
+        <button type="button" class="popover-item" id="toolCreateImageBtn">
+          <div class="popover-item-left">
+            <i data-lucide="image" style="width: 15px; height: 15px;"></i>
+            <div>
+              <div class="item-title">Create Image</div>
+              <div class="item-desc">Generate visuals with AI</div>
+            </div>
+          </div>
+        </button>
+        <button type="button" class="popover-item" id="toolCreateVideoBtn">
+          <div class="popover-item-left">
+            <i data-lucide="video" style="width: 15px; height: 15px;"></i>
+            <div>
+              <div class="item-title">Generate AI Video</div>
+              <div class="item-desc">Create cinematic motion shots</div>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsDialogTitle">
+      <div class="settings-dialog">
+        <div class="dialog-header">
+          <h2 class="dialog-title" id="settingsDialogTitle">Settings</h2>
+          <button type="button" class="icon-btn" id="closeSettingsBtn" aria-label="Close Settings">
+            <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+          </button>
+        </div>
+        <div class="dialog-body">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Appearance</div>
+              <div class="setting-desc">Select visual color theme</div>
+            </div>
+            <select class="setting-select" id="themeSelect">
+              <option value="light">Light Mode (Warm Cream)</option>
+              <option value="dark">Dark Mode (Warm Charcoal)</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Default Model</div>
+              <div class="setting-desc">Model used for new conversations</div>
+            </div>
+            <select class="setting-select" id="defaultModelSelect">
+              <option value="gemini-3.7-flash">Gemini 3.7 Flash (Google)</option>
+              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Groq LPU)</option>
+              <option value="qwen/qwen3.6-27b">Qwen 3.6 Reasoner (Groq)</option>
+              <option value="openrouter/free">OpenRouter Auto Hub</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Streaming Response</div>
+              <div class="setting-desc">Stream answers progressively as they generate</div>
+            </div>
+            <input type="checkbox" id="streamSettingCheckbox" checked>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Clear All History</div>
+              <div class="setting-desc">Erase all local conversation logs and messages</div>
+            </div>
+            <button type="button" class="btn-secondary" id="clearAllHistoryBtn" style="color: #ef4444;">Clear History</button>
+          </div>
+
+          <div class="setting-row" style="border-top: 1px solid var(--border-subtle); padding-top: 1rem;">
+            <div>
+              <div class="setting-label">About oska.AI</div>
+              <div class="setting-desc">Version 1.0 (Production Multi-Model Release)</div>
+            </div>
+            <span class="brand-badge">V1</span>
+          </div>
+        </div>
+        <div class="dialog-footer">
+          <button type="button" class="btn-primary" id="saveSettingsBtn">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
