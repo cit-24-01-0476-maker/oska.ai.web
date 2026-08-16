@@ -731,10 +731,24 @@ document.addEventListener('DOMContentLoaded', () => {
   renderModePopoverList();
   renderProjectsSidebar();
   renderConversationsList();
+  renderMobileAiSheet();
+  updateMobileAiSettingsLabel();
 
   const mode = BEHAVIOR_MODES.find(m => m.id === state.selectedMode) || BEHAVIOR_MODES[0];
   const modeLabel = document.getElementById('composerModeLabel');
   if (modeLabel) modeLabel.textContent = mode.name;
+
+  const chatInput = document.getElementById('chatInput');
+  if (chatInput && window.innerWidth <= 768) {
+    chatInput.placeholder = 'Message oska.AI…';
+  }
+
+  window.addEventListener('resize', () => {
+    updateMobileAiSettingsLabel();
+    if (chatInput && !state.activeTool) {
+      chatInput.placeholder = window.innerWidth <= 768 ? 'Message oska.AI…' : 'Message oska.AI... (Shift + Enter for new line)';
+    }
+  });
 
   if (typeof hljs !== 'undefined') {
     hljs.configure({ ignoreUnescapedHTML: true });
@@ -977,33 +991,44 @@ function setupUIEventListeners() {
   document.querySelectorAll('#languagePopoverList [data-lang]').forEach(btn => {
     btn.addEventListener('click', () => {
       const lang = btn.getAttribute('data-lang');
-      state.responseLanguage = lang;
-      document.getElementById('composerLangLabel').textContent = btn.querySelector('.item-title').textContent.split(' ')[0];
-      document.querySelectorAll('#languagePopoverList [data-lang]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      selectResponseLanguage(lang);
       hideAllPopovers();
-      showToast(`Language set to ${btn.querySelector('.item-title').textContent}`);
     });
   });
 
-    // Model, Effort, and Mode Popovers
-    composerModelBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      togglePopover('composerModelPopover');
-    });
+  // Model, Effort, and Mode Popovers (Desktop)
+  composerModelBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePopover('composerModelPopover');
+  });
 
-    composerEffortBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      togglePopover('composerEffortPopover');
-    });
+  composerEffortBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePopover('composerEffortPopover');
+  });
 
-    const composerModeBtn = document.getElementById('composerModeBtn');
-    if (composerModeBtn) {
-      composerModeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        togglePopover('composerModePopover');
-      });
-    }
+  const composerModeBtn = document.getElementById('composerModeBtn');
+  if (composerModeBtn) {
+    composerModeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover('composerModePopover');
+    });
+  }
+
+  // Mobile Unified AI Settings Sheet Trigger & Actions
+  const mobileAiSettingsBtn = document.getElementById('mobileAiSettingsBtn');
+  if (mobileAiSettingsBtn) {
+    mobileAiSettingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      renderMobileAiSheet();
+      togglePopover('mobileAiSheet');
+    });
+  }
+
+  const closeMobileAiSheetBtn = document.getElementById('closeMobileAiSheetBtn');
+  const mobileAiSheetDoneBtn = document.getElementById('mobileAiSheetDoneBtn');
+  if (closeMobileAiSheetBtn) closeMobileAiSheetBtn.addEventListener('click', hideAllPopovers);
+  if (mobileAiSheetDoneBtn) mobileAiSheetDoneBtn.addEventListener('click', hideAllPopovers);
 
     // Projects UI Events
     const sidebarNewProjectBtn = document.getElementById('sidebarNewProjectBtn');
@@ -1253,6 +1278,110 @@ function renderModelPopoverList() {
   });
 }
 
+function updateMobileAiSettingsLabel() {
+  const label = document.getElementById('mobileAiSettingsLabel');
+  if (!label) return;
+
+  const model = DEFAULT_MODELS.find(m => m.id === state.selectedModel) || DEFAULT_MODELS[0];
+  const shortModel = model.name.replace('Flash', '').replace('Reasoner', '').replace('Hub', '').trim();
+  const effortConfig = REASONING_EFFORT_CONFIG[state.reasoningEffort] || REASONING_EFFORT_CONFIG['medium'];
+
+  if (window.innerWidth <= 380) {
+    label.textContent = shortModel.split(' ')[0] || 'AI';
+  } else {
+    label.textContent = `${shortModel} · ${effortConfig.label}`;
+  }
+}
+
+function renderMobileAiSheet() {
+  // 1. Behavior Modes
+  const modeContainer = document.getElementById('mobileModeGrid');
+  if (modeContainer) {
+    modeContainer.innerHTML = BEHAVIOR_MODES.map(mode => `
+      <button type="button" class="sheet-pill-btn ${mode.id === state.selectedMode ? 'active' : ''}" data-mode-id="${mode.id}">
+        <span>${mode.name}</span>
+        <span class="mode-badge-tag">${mode.tag}</span>
+      </button>
+    `).join('');
+
+    modeContainer.querySelectorAll('.sheet-pill-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectBehaviorMode(btn.getAttribute('data-mode-id'));
+      });
+    });
+  }
+
+  // 2. AI Models
+  const modelContainer = document.getElementById('mobileModelGrid');
+  if (modelContainer) {
+    modelContainer.innerHTML = DEFAULT_MODELS.map(model => `
+      <button type="button" class="sheet-pill-btn ${model.id === state.selectedModel ? 'active' : ''}" data-model-id="${model.id}">
+        <span>${model.name}</span>
+      </button>
+    `).join('');
+
+    modelContainer.querySelectorAll('.sheet-pill-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectModel(btn.getAttribute('data-model-id'));
+      });
+    });
+  }
+
+  // 3. Reasoning Efforts
+  const effortContainer = document.getElementById('mobileEffortGrid');
+  if (effortContainer) {
+    const currentModel = DEFAULT_MODELS.find(m => m.id === state.selectedModel) || DEFAULT_MODELS[0];
+    const supported = currentModel.supportedEfforts || ['instant', 'medium', 'high', 'extra-high', 'pro'];
+
+    effortContainer.innerHTML = Object.entries(REASONING_EFFORT_CONFIG)
+      .filter(([key]) => supported.includes(key))
+      .map(([key, config]) => `
+        <button type="button" class="sheet-pill-btn ${key === state.reasoningEffort ? 'active' : ''}" data-effort-key="${key}">
+          <span>${config.label}</span>
+        </button>
+      `).join('');
+
+    effortContainer.querySelectorAll('.sheet-pill-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectEffort(btn.getAttribute('data-effort-key'));
+      });
+    });
+  }
+
+  // 4. Response Languages
+  const langContainer = document.getElementById('mobileLangGrid');
+  if (langContainer) {
+    langContainer.querySelectorAll('.sheet-pill-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-lang') === state.responseLanguage);
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectResponseLanguage(btn.getAttribute('data-lang'));
+      };
+    });
+  }
+}
+
+function selectResponseLanguage(lang) {
+  state.responseLanguage = lang;
+  const desktopLabel = document.getElementById('composerLangLabel');
+  const matchingBtn = document.querySelector(`#languagePopoverList [data-lang="${lang}"]`);
+  if (desktopLabel && matchingBtn) {
+    desktopLabel.textContent = matchingBtn.querySelector('.item-title').textContent.split(' ')[0];
+  }
+  document.querySelectorAll('#languagePopoverList [data-lang]').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-lang') === lang);
+  });
+  renderMobileAiSheet();
+  showToast(`Language set to ${lang}`);
+}
+
 function selectModel(modelId) {
   const model = DEFAULT_MODELS.find(m => m.id === modelId) || DEFAULT_MODELS[0];
   state.selectedModel = model.id;
@@ -1267,6 +1396,8 @@ function selectModel(modelId) {
   document.getElementById('composerModelLabel').textContent = model.name;
   renderModelPopoverList();
   renderEffortPopoverList();
+  renderMobileAiSheet();
+  updateMobileAiSettingsLabel();
   showToast(`Active model: ${model.name}`);
 }
 
@@ -1308,6 +1439,8 @@ function selectEffort(effortKey) {
   const config = REASONING_EFFORT_CONFIG[effortKey] || REASONING_EFFORT_CONFIG['medium'];
   document.getElementById('composerEffortLabel').textContent = config.label;
   renderEffortPopoverList();
+  renderMobileAiSheet();
+  updateMobileAiSettingsLabel();
   showToast(`Reasoning effort: ${config.label}`);
 }
 
@@ -1591,6 +1724,8 @@ function selectBehaviorMode(modeId) {
   const label = document.getElementById('composerModeLabel');
   if (label) label.textContent = mode.name;
   renderModePopoverList();
+  renderMobileAiSheet();
+  updateMobileAiSettingsLabel();
   showToast(`Behavior mode: ${mode.name}`);
 }
 
@@ -2648,18 +2783,6 @@ function appendMessageToDOM(role, content, reasoning, media, citations, chart, r
     `;
   }
 
-  if (reasoning) {
-    renderedHTML += `
-      <div class="reasoning-box">
-        <div class="reasoning-header" onclick="this.parentElement.classList.toggle('collapsed')">
-          <span>💭 Thought Process & Reasoning</span>
-          <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
-        </div>
-        <div class="reasoning-content">${escapeHtml(reasoning)}</div>
-      </div>
-    `;
-  }
-
   renderedHTML += renderMarkdown(content);
 
   if (citations && citations.length > 0) {
@@ -2695,18 +2818,6 @@ function updateAssistantMessageDOM(bubbleElement, text, reasoning, isStreaming, 
 
   // Small oska.AI mark at top of response
   html += '<div class="oska-response-mark">O</div>';
-
-  if (reasoning) {
-    html += `
-      <div class="reasoning-box">
-        <div class="reasoning-header" onclick="this.parentElement.classList.toggle('collapsed')">
-          <span>💭 Thinking (${reasoning.length} chars)</span>
-          <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
-        </div>
-        <div class="reasoning-content">${escapeHtml(reasoning)}</div>
-      </div>
-    `;
-  }
 
   html += '<div class="oska-stream-content">';
   html += renderMarkdown(text);

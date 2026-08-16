@@ -412,6 +412,59 @@
           </div>
         </div>
 
+        <!-- Mobile Unified AI Settings Bottom Sheet (< 768px) -->
+        <div class="composer-popover mobile-sheet-popover hidden" id="mobileAiSheet" role="menu" aria-label="AI Settings">
+          <div class="popover-sheet-handle"></div>
+          <div class="sheet-title-bar">
+            <div class="sheet-main-title">
+              <i data-lucide="sparkles" style="width: 15px; height: 15px; color: var(--accent-primary);"></i>
+              <span>AI Configuration</span>
+            </div>
+            <button type="button" class="sheet-close-icon-btn" id="closeMobileAiSheetBtn" aria-label="Close AI settings">
+              <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+            </button>
+          </div>
+          <div class="sheet-scroll-body">
+            <!-- Mode Section -->
+            <div class="sheet-block">
+              <div class="sheet-block-title">BEHAVIOR PROFILE</div>
+              <div class="sheet-pill-grid" id="mobileModeGrid">
+                <!-- Dynamically rendered -->
+              </div>
+            </div>
+
+            <!-- Model Section -->
+            <div class="sheet-block">
+              <div class="sheet-block-title">AI MODEL</div>
+              <div class="sheet-pill-grid" id="mobileModelGrid">
+                <!-- Dynamically rendered -->
+              </div>
+            </div>
+
+            <!-- Reasoning Effort Section -->
+            <div class="sheet-block">
+              <div class="sheet-block-title">REASONING EFFORT</div>
+              <div class="sheet-pill-grid" id="mobileEffortGrid">
+                <!-- Dynamically rendered -->
+              </div>
+            </div>
+
+            <!-- Response Language Section -->
+            <div class="sheet-block">
+              <div class="sheet-block-title">RESPONSE LANGUAGE</div>
+              <div class="sheet-pill-grid" id="mobileLangGrid">
+                <button type="button" class="sheet-pill-btn active" data-lang="auto">Auto (Default)</button>
+                <button type="button" class="sheet-pill-btn" data-lang="english">English</button>
+                <button type="button" class="sheet-pill-btn" data-lang="sinhala">සිංහල</button>
+                <button type="button" class="sheet-pill-btn" data-lang="singlish">Singlish</button>
+              </div>
+            </div>
+          </div>
+          <div class="sheet-footer-action">
+            <button type="button" class="sheet-done-btn" id="mobileAiSheetDoneBtn">Done</button>
+          </div>
+        </div>
+
         <div class="composer-box" id="composerBox">
           <!-- Active Tool Indicator Bar -->
           <div class="active-tool-bar hidden" id="activeToolBar"></div>
@@ -433,40 +486,47 @@
               <!-- File Attachment Button -->
               <input type="file" id="fileInput" multiple style="display: none;" accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.txt,.json,.js,.ts,.tsx,.py,.java,.cpp,.html,.css,.md">
               <button type="button" class="composer-btn" id="attachBtn" title="Attach files, PDFs, spreadsheets, or images" aria-label="Attach files">
-                <i data-lucide="paperclip" style="width: 15px; height: 15px;"></i>
+                <i data-lucide="paperclip" style="width: 16px; height: 16px;"></i>
                 <span class="btn-label-desktop">Attach</span>
               </button>
 
               <!-- Tools Menu Popover Trigger -->
-              <button type="button" class="composer-btn" id="toolsMenuBtn" title="Workspace Tools" aria-label="Tools">
+              <button type="button" class="composer-btn" id="toolsMenuBtn" title="Workspace Tools" aria-label="Workspace tools">
                 <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
                 <span class="btn-label-desktop">Tools</span>
               </button>
 
-              <!-- Language Quick Selector -->
-              <button type="button" class="composer-btn" id="composerLangBtn" title="Response Language" aria-label="Language">
+              <!-- Language Quick Selector (Desktop) -->
+              <button type="button" class="composer-btn desktop-control" id="composerLangBtn" title="Response Language" aria-label="Language">
                 <i data-lucide="languages" style="width: 15px; height: 15px;"></i>
                 <span class="btn-label-desktop" id="composerLangLabel">Auto</span>
               </button>
             </div>
 
             <div class="composer-actions-right">
-              <!-- Interactive Behavior Mode Selector Button -->
-              <button type="button" class="composer-control-pill" id="composerModeBtn" title="Select Behavior Mode" aria-haspopup="true" aria-expanded="false" aria-label="Select Behavior Mode">
+              <!-- Desktop: Interactive Behavior Mode Selector Button -->
+              <button type="button" class="composer-control-pill desktop-control" id="composerModeBtn" title="Select Behavior Mode" aria-haspopup="true" aria-expanded="false" aria-label="Select Behavior Mode">
                 <span class="control-label" id="composerModeLabel">Auto</span>
-                <i data-lucide="chevron-down" style="width: 13px; height: 13px;" class="chevron-icon"></i>
+                <i data-lucide="chevron-down" style="width: 12px; height: 12px;" class="chevron-icon"></i>
               </button>
 
-              <!-- Interactive Model Selector Button -->
-              <button type="button" class="composer-control-pill" id="composerModelBtn" title="Select AI Model" aria-haspopup="true" aria-expanded="false" aria-label="Select AI Model">
+              <!-- Desktop: Interactive Model Selector Button -->
+              <button type="button" class="composer-control-pill desktop-control" id="composerModelBtn" title="Select AI Model" aria-haspopup="true" aria-expanded="false" aria-label="Select AI Model">
                 <span class="control-label" id="composerModelLabel">Gemini 3.7 Flash</span>
-                <i data-lucide="chevron-down" style="width: 13px; height: 13px;" class="chevron-icon"></i>
+                <i data-lucide="chevron-down" style="width: 12px; height: 12px;" class="chevron-icon"></i>
               </button>
 
-              <!-- Interactive Reasoning Effort Selector Button -->
-              <button type="button" class="composer-control-pill" id="composerEffortBtn" title="Select Reasoning Effort" aria-haspopup="true" aria-expanded="false" aria-label="Select Reasoning Effort">
+              <!-- Desktop: Interactive Reasoning Effort Selector Button -->
+              <button type="button" class="composer-control-pill desktop-control" id="composerEffortBtn" title="Select Reasoning Effort" aria-haspopup="true" aria-expanded="false" aria-label="Select Reasoning Effort">
                 <span class="control-label" id="composerEffortLabel">Extra High</span>
-                <i data-lucide="chevron-down" style="width: 13px; height: 13px;" class="chevron-icon"></i>
+                <i data-lucide="chevron-down" style="width: 12px; height: 12px;" class="chevron-icon"></i>
+              </button>
+
+              <!-- Mobile: Unified AI Settings Pill (< 768px) -->
+              <button type="button" class="composer-control-pill mobile-ai-btn" id="mobileAiSettingsBtn" title="AI Settings (Mode, Model, Reasoning)" aria-haspopup="true" aria-expanded="false" aria-label="AI Settings">
+                <i data-lucide="sparkles" style="width: 13px; height: 13px; color: var(--accent-primary);"></i>
+                <span class="control-label" id="mobileAiSettingsLabel">Gemini · High</span>
+                <i data-lucide="chevron-down" style="width: 12px; height: 12px;" class="chevron-icon"></i>
               </button>
 
               <!-- Send & Stop Generation Buttons -->
