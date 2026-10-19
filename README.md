@@ -36,8 +36,8 @@ A production-grade, multi-provider conversational AI platform inspired by the ca
 
 ```bash
 # 1. Clone repository
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd oska-ai-v1
+git clone https://github.com/cit-24-01-0476-maker/oska.ai.web.git
+cd oska.ai.web
 
 # 2. Copy environment template and add your API keys
 cp .env.example .env
@@ -58,7 +58,7 @@ git init
 git add .
 git commit -m "feat: initial oska.AI V1 production release"
 git branch -M main
-git remote add origin https://github.com/<YOUR_USERNAME>/oska-ai-v1.git
+git remote add origin https://github.com/cit-24-01-0476-maker/oska.ai.web.git
 git push -u origin main
 ```
 
